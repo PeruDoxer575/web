@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PERUDOXER | Servicios Digitales</title>
+  <meta name="description" content="PERUDOXER ofrece servicios digitales con atención directa por WhatsApp, pagos en soles y confirmación por Plin para clientes de todo el Perú.">
+  <meta name="keywords" content="PERUDOXER, servicios digitales, pagos en soles, Plin, WhatsApp, Perú">
+  <meta name="theme-color" content="#07111f">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="PERUDOXER | Servicios Digitales">
+  <meta property="og:description" content="Servicios digitales con atención directa, pagos en soles y coordinación rápida por WhatsApp para todo el Perú.">
+  <meta property="og:image" content="assets/logo.jpeg">
+  <meta property="og:locale" content="es_PE">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PERUDOXER | Servicios Digitales">
+  <meta name="twitter:description" content="Servicios digitales con atención directa, pagos en soles y coordinación rápida por WhatsApp para todo el Perú.">
+  <meta name="twitter:image" content="assets/logo.jpeg">
+  <link rel="icon" type="image/jpeg" href="assets/logo.jpeg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="bg-orb bg-orb-a"></div>
+  <div class="bg-orb bg-orb-b"></div>
+
+  <a id="floating-whatsapp" class="floating-whatsapp hidden" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+
+  <header class="hero">
+    <nav class="nav">
+      <div class="brand-block">
+        <img id="brand-logo" class="brand-logo hidden" alt="Logo de PERUDOXER">
+        <p class="eyebrow">PERUDOXER</p>
+        <h1>Servicios digitales con atención directa y pagos en soles</h1>
+        <p id="brand-handle" class="brand-handle hidden"></p>
+      </div>
+      <button id="open-admin" class="ghost-button" type="button">Panel admin</button>
+    </nav>
+
+    <section class="hero-content">
+      <div class="hero-copy">
+        <p class="hero-kicker">Marca, confianza y venta directa</p>
+        <p class="intro">
+          En PERUDOXER ofrecemos servicios digitales con atención directa, pagos en soles y coordinación rápida por WhatsApp para todo el Perú.
+        </p>
+        <div class="hero-actions">
+          <a class="primary-button" href="#services">Ver servicios</a>
+          <a class="secondary-button" href="#testimonials">Ver reseñas</a>
+        </div>
+        <div class="hero-metrics">
+          <div class="metric">
+            <strong>Pagos en soles</strong>
+            <span>Transferencias y depósitos con bancos del Perú.</span>
+          </div>
+          <div class="metric">
+            <strong>Imágenes reales</strong>
+            <span>Varios ejemplos por servicio para mostrar mejor tu oferta.</span>
+          </div>
+          <div class="metric">
+            <strong>Gestión rápida</strong>
+            <span>Edita catálogo, fotos y reseñas desde un panel privado.</span>
+          </div>
+        </div>
+      </div>
+
+      <aside class="info-card">
+        <p class="card-label">Modo de venta</p>
+        <h2>Atención por WhatsApp</h2>
+        <p>
+          El cliente elige un servicio, deja sus datos y abre tu chat de WhatsApp con el pedido ya redactado.
+        </p>
+        <ul>
+          <li>Pagos en soles peruanos</li>
+          <li>BCP, Interbank, BBVA, Scotiabank, Yape y Plin</li>
+          <li>Respaldo por correo si SMTP está activo</li>
+        </ul>
+      </aside>
+    </section>
+  </header>
+
+  <section class="trust-strip">
+    <div class="trust-item">Presentación profesional</div>
+    <div class="trust-item">Pedidos por WhatsApp</div>
+    <div class="trust-item">Pagos en soles</div>
+    <div class="trust-item">Bancos del Perú</div>
+  </section>
+
+  <main>
+    <section class="section" id="services">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">CATÁLOGO</p>
+          <h2>Servicios disponibles</h2>
+        </div>
+        <p id="whatsapp-line" class="section-copy"></p>
+      </div>
+      <div id="services-filters" class="services-filters"></div>
+      <div id="services-grid" class="services-grid"></div>
+    </section>
+
+    <section class="section payment-section" id="payments">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">PAGOS</p>
+          <h2>Pagos en soles para todo el Perú</h2>
+        </div>
+        <p class="section-copy">
+          <span id="payment-copy">El pago se realiza por Plin con QR y puede enviarse desde cualquier banco del Perú que permita Plin.</span>
+        </p>
+      </div>
+      <div class="payment-grid">
+        <article class="payment-card">
+          <h3>Moneda</h3>
+          <p>Todos los servicios se manejan en soles peruanos `S/`.</p>
+        </article>
+        <article class="payment-card">
+          <h3>Método de pago</h3>
+          <p id="payment-method-copy">Plin por QR. El cliente puede pagar desde cualquier banco compatible con Plin.</p>
+        </article>
+        <article class="payment-card">
+          <h3>Confirmación</h3>
+          <p>Después de pagar por Plin, el cliente envía su comprobante directamente por WhatsApp para confirmar el pedido.</p>
+        </article>
+        <article id="payment-qr-card" class="payment-card hidden">
+          <h3>QR de Plin</h3>
+          <p id="payment-qr-name"></p>
+          <img id="payment-qr-image" class="payment-qr-image" alt="QR de pago Plin" loading="lazy">
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="why-us">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">POR QUÉ ELEGIRNOS</p>
+          <h2>Por qué elegir PERUDOXER</h2>
+        </div>
+        <p class="section-copy">
+          Una atención más directa, clara y ordenada para que el cliente sienta confianza desde el primer contacto.
+        </p>
+      </div>
+      <div class="why-grid">
+        <article class="why-card">
+          <h3>Atención directa</h3>
+          <p>La coordinación del pedido se realiza contigo por WhatsApp, sin procesos innecesarios.</p>
+        </article>
+        <article class="why-card">
+          <h3>Confianza y claridad</h3>
+          <p>Servicios presentados con descripción, precio en soles y fotos de ejemplo para mayor seguridad.</p>
+        </article>
+        <article class="why-card">
+          <h3>Pagos accesibles</h3>
+          <p>Aceptas transferencias desde bancos del Perú, además de métodos como Yape y Plin.</p>
+        </article>
+        <article class="why-card">
+          <h3>Respuesta rápida</h3>
+          <p>El cliente puede escribirte de inmediato para confirmar detalles y avanzar con su solicitud.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section how-it-works" id="how-it-works">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">FLUJO</p>
+          <h2>Compra en 3 pasos</h2>
+        </div>
+      </div>
+      <div class="steps">
+        <article class="step-card">
+          <span>01</span>
+          <h3>Eligen un servicio</h3>
+          <p>El cliente revisa el catálogo y sus fotos de ejemplo.</p>
+        </article>
+        <article class="step-card">
+          <span>02</span>
+          <h3>Completa sus datos</h3>
+          <p>Ingresa nombre, teléfono y el detalle de lo que necesita.</p>
+        </article>
+        <article class="step-card">
+          <span>03</span>
+          <h3>Te escribe al instante</h3>
+          <p>El mensaje se abre listo en tu WhatsApp para cerrar la venta.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="testimonials">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">RESEÑAS</p>
+          <h2>Confianza que ayuda a vender</h2>
+        </div>
+      </div>
+      <div id="testimonials-grid" class="testimonials-grid"></div>
+    </section>
+
+    <section class="section" id="faq">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">FAQ</p>
+          <h2>Dudas frecuentes antes de comprar</h2>
+        </div>
+        <p class="section-copy">Respuestas claras para que el cliente entienda cómo pagar, confirmar y coordinar su pedido.</p>
+      </div>
+      <div class="faq-grid">
+        <article class="faq-card">
+          <h3>¿Cómo se realiza el pago?</h3>
+          <p>El pago se realiza por Plin en soles y luego se confirma enviando el comprobante por WhatsApp.</p>
+        </article>
+        <article class="faq-card">
+          <h3>¿Desde qué banco puedo pagar?</h3>
+          <p>Puedes pagar desde cualquier banco del Perú compatible con Plin.</p>
+        </article>
+        <article class="faq-card">
+          <h3>¿A nombre de quién está el QR?</h3>
+          <p id="faq-payment-holder">El QR de pago se mostrará con el titular configurado en la tienda.</p>
+        </article>
+        <article class="faq-card">
+          <h3>¿Cómo confirmo mi pedido?</h3>
+          <p>Abres el WhatsApp con el pedido listo, realizas el pago y mandas tu comprobante para cerrar la coordinación.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section final-cta">
+      <div class="cta-card">
+        <p class="eyebrow">CONTACTO</p>
+        <h2>Listo para recibir pedidos con una presencia más seria</h2>
+        <p class="section-copy">Tu catálogo, tu marca y tu atención directa en un solo lugar.</p>
+        <div class="cta-actions">
+          <a class="primary-button" href="#services">Explorar catálogo</a>
+          <button id="open-admin-footer" class="secondary-button" type="button">Abrir panel</button>
+        </div>
+        <div class="contact-inline">
+          <span id="footer-phone"></span>
+          <span id="footer-email"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="order-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-close-modal="true"></div>
+    <div class="modal-panel">
+      <button class="modal-close" type="button" data-close-modal="true">x</button>
+      <p class="eyebrow">PEDIDO</p>
+      <h2 id="order-service-name"></h2>
+      <p id="order-service-price" class="modal-price"></p>
+      <div id="order-service-gallery" class="order-gallery"></div>
+      <div class="order-payment-box">
+        <strong>Pago por Plin</strong>
+        <p id="order-payment-copy">Realiza el pago por Plin y luego envía tu comprobante por WhatsApp para confirmar.</p>
+        <p id="order-payment-holder" class="hidden"></p>
+        <img id="order-payment-qr" class="payment-qr-image hidden" alt="QR de pago Plin" loading="lazy">
+      </div>
+
+      <form id="order-form" class="form">
+        <label>
+          Nombre
+          <input name="customerName" type="text" placeholder="Tu nombre" required>
+        </label>
+        <label>
+          WhatsApp o teléfono
+          <input name="customerPhone" type="text" placeholder="Tu número" required>
+        </label>
+        <label>
+          Detalles del pedido
+          <textarea name="details" rows="4" placeholder="Cuéntame qué necesitas" required></textarea>
+        </label>
+        <button class="primary-button full-width" type="submit">Enviar pedido por WhatsApp</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="admin-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-close-admin="true"></div>
+    <div class="modal-panel admin-panel">
+      <button class="modal-close" type="button" data-close-admin="true">x</button>
+      <p class="eyebrow">ADMIN</p>
+      <h2>Gestionar servicios</h2>
+      <p id="admin-status" class="section-copy"></p>
+
+      <section id="admin-auth-view">
+        <form id="admin-login-form" class="form compact-form">
+          <h3>Iniciar sesion</h3>
+          <label>
+            Usuario
+            <input name="username" type="text" placeholder="admin" required>
+          </label>
+          <label>
+            Clave de administrador
+            <input name="password" type="password" placeholder="Ingresa tu clave" required>
+          </label>
+          <button class="primary-button full-width" type="submit">Entrar al panel</button>
+          <p id="login-error" class="error-text"></p>
+        </form>
+      </section>
+
+      <section id="admin-dashboard-view" class="hidden">
+        <div class="admin-top-actions">
+          <button id="logout-admin" class="ghost-button" type="button">Cerrar sesion</button>
+        </div>
+
+        <form id="settings-form" class="form compact-form">
+          <h3>Configuracion general</h3>
+          <label>
+            Numero de WhatsApp
+            <input name="whatsappNumber" type="text" placeholder="51988899790" required>
+          </label>
+          <label>
+            Ruta o URL del logo
+            <input name="logoUrl" type="text" placeholder="assets/logo.jpeg o https://..." required>
+          </label>
+          <label>
+            Usuario o lema
+            <input name="storeHandle" type="text" placeholder="@serviciosdoxer">
+          </label>
+          <label>
+            Correo del negocio
+            <input name="storeEmail" type="email" placeholder="perudoxer@gmail.com" required>
+          </label>
+          <label>
+            Nombre del negocio
+            <input name="storeName" type="text" placeholder="PERUDOXER" required>
+          </label>
+          <label>
+            Titular del Plin
+            <input name="paymentHolder" type="text" placeholder="Kimberly Cunyas">
+          </label>
+          <label>
+            Subir QR de Plin
+            <input id="payment-qr-upload" type="file" accept="image/*">
+          </label>
+          <label>
+            Ruta o URL del QR
+            <input name="paymentQrUrl" type="text" placeholder="uploads/plin-qr.jpeg o https://...">
+          </label>
+          <p class="helper-text">Cuando subas el QR se verá aquí mismo. Luego guarda la configuración para publicarlo.</p>
+          <img id="payment-qr-preview" class="payment-qr-preview hidden" alt="Vista previa del QR de Plin" loading="lazy">
+          <button class="secondary-button full-width" type="submit">Guardar configuracion</button>
+        </form>
+
+        <form id="service-form" class="form compact-form">
+          <h3 id="service-form-title">Agregar servicio</h3>
+          <input name="serviceId" type="hidden">
+          <label>
+            Nombre del servicio
+            <input name="name" type="text" placeholder="Servicio premium" required>
+          </label>
+          <label>
+            Categoria
+            <input name="category" type="text" placeholder="Premium, cuentas, accesos..." required>
+          </label>
+          <label>
+            Estado
+            <select name="status" required>
+              <option value="Disponible">Disponible</option>
+              <option value="Nuevo">Nuevo</option>
+              <option value="Oferta">Oferta</option>
+              <option value="Agotado">Agotado</option>
+            </select>
+          </label>
+          <label>
+            Precio en soles
+            <input name="price" type="text" placeholder="S/ 49" required>
+          </label>
+          <label>
+            Descripcion
+            <textarea name="description" rows="3" placeholder="Explica qué incluye" required></textarea>
+          </label>
+          <label>
+            Subir imágenes
+            <input id="service-images-upload" type="file" accept="image/*" multiple>
+          </label>
+          <label>
+            Rutas o URLs de imágenes
+            <textarea id="service-images" rows="4" placeholder="Una ruta por línea. Ejemplo:&#10;uploads/imagen1.jpg&#10;assets/servicio1.jpeg" required></textarea>
+          </label>
+          <p class="helper-text">La primera línea será la portada del servicio. Puedes reordenarlas cortando y pegando.</p>
+          <div id="service-image-manager" class="service-image-manager"></div>
+          <button class="primary-button full-width" type="submit">Guardar servicio</button>
+          <button id="cancel-edit" class="ghost-button full-width hidden" type="button">Cancelar edicion</button>
+        </form>
+
+        <form id="testimonial-form" class="form compact-form">
+          <h3>Agregar reseña</h3>
+          <label>
+            Nombre del cliente
+            <input name="author" type="text" placeholder="Cliente satisfecho" required>
+          </label>
+          <label>
+            Ciudad o referencia
+            <input name="role" type="text" placeholder="Lima, Peru" required>
+          </label>
+          <label>
+            Reseña
+            <textarea name="quote" rows="3" placeholder="Comentario del cliente" required></textarea>
+          </label>
+          <button class="primary-button full-width" type="submit">Guardar reseña</button>
+          <button id="cancel-testimonial-edit" class="ghost-button full-width hidden" type="button">Cancelar edicion</button>
+        </form>
+
+        <section class="admin-services">
+          <div class="admin-services-header">
+            <h3>Servicios cargados</h3>
+            <button id="reset-data" class="ghost-button" type="button">Restaurar demo</button>
+          </div>
+          <div id="admin-services-list" class="admin-services-list"></div>
+        </section>
+
+        <section class="admin-services">
+          <div class="admin-services-header">
+            <h3>Reseñas cargadas</h3>
+          </div>
+          <div id="admin-testimonials-list" class="admin-services-list"></div>
+        </section>
+      </section>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
