@@ -197,6 +197,68 @@ h2 { font-size: clamp(2rem, 4vw, 3rem); }
 }
 
 .section { padding: 40px 0 80px; }
+.featured-service {
+  margin-top: 28px;
+}
+.featured-service-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+  gap: 24px;
+  align-items: center;
+  padding: 28px;
+  border: 1px solid rgba(214, 196, 154, 0.18);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at top right, rgba(214, 196, 154, 0.12), transparent 22%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
+    var(--bg-soft);
+  box-shadow: var(--shadow);
+}
+.featured-service-card h3 {
+  font-size: clamp(2rem, 3vw, 2.8rem);
+}
+.featured-service-image {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 24px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.04);
+}
+.featured-service-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 18px;
+}
+.services-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 22px;
+}
+.services-search {
+  flex: 1;
+}
+.services-search input {
+  width: 100%;
+  border: 1px solid rgba(214, 196, 154, 0.16);
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+}
+.services-search input:focus {
+  outline: 2px solid rgba(214, 196, 154, 0.24);
+  border-color: transparent;
+}
+.services-results {
+  margin: 0;
+  color: var(--muted);
+  white-space: nowrap;
+}
 .services-filters { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
 .services-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 280px)); justify-content: center; margin-top: 28px; }
 .service-filter, .service-category {
@@ -358,6 +420,23 @@ h2 { font-size: clamp(2rem, 4vw, 3rem); }
   font-size: 0.72rem;
 }
 
+.price-options-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.price-option-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(214, 196, 154, 0.16);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .service-card h3, .payment-card h3, .testimonial-card strong { font-size: 1.55rem; }
 .admin-service-status { margin: 0 0 8px; }
 .admin-service-category { margin: 0 0 8px; color: var(--gold); font-weight: 700; }
@@ -500,6 +579,14 @@ h2 { font-size: clamp(2rem, 4vw, 3rem); }
 .form { display: grid; gap: 14px; }
 .compact-form { padding: 20px; margin-top: 18px; }
 .form label { display: grid; gap: 8px; color: var(--muted); }
+.inline-check {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+.inline-check input {
+  width: 18px;
+  height: 18px;
+}
 
 .form input, .form textarea, .form select {
   width: 100%;
@@ -599,6 +686,12 @@ h2 { font-size: clamp(2rem, 4vw, 3rem); }
 .full-width { width: 100%; }
 .admin-services { margin-top: 20px; }
 .admin-top-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
 .error-text { min-height: 24px; margin: 0; color: var(--danger); }
 
 .empty-state {
@@ -607,6 +700,17 @@ h2 { font-size: clamp(2rem, 4vw, 3rem); }
   color: var(--muted);
   border: 1px dashed rgba(255, 255, 255, 0.12);
   border-radius: 20px;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 @media (max-width: 780px) {
@@ -621,10 +725,13 @@ h2 { font-size: clamp(2rem, 4vw, 3rem); }
   h1 { font-size: clamp(2.2rem, 11vw, 3.4rem); }
   .hero-actions, .cta-actions { width: 100%; }
   .hero-actions a, .cta-actions a, .cta-actions button { width: 100%; }
+  .featured-service-card { grid-template-columns: 1fr; }
+  .services-toolbar { flex-direction: column; align-items: stretch; }
   .services-grid { grid-template-columns: 1fr; }
   .payment-grid, .faq-grid, .testimonials-grid, .why-grid, .steps { grid-template-columns: 1fr; }
   .payment-qr-image, .payment-qr-preview { max-width: 100%; }
   .admin-top-actions { justify-content: flex-start; }
+  .admin-stats { grid-template-columns: 1fr; }
   .floating-whatsapp { right: 14px; bottom: 14px; }
   .service-image-sort-item { grid-template-columns: 1fr; }
   .service-image-sort-actions { justify-content: flex-start; }

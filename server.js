@@ -21,6 +21,8 @@ const SMTP_PASS = process.env.SMTP_PASS || "";
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER || "";
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const RESEND_FROM = process.env.RESEND_FROM || "";
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "";
 const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || "";
 const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || "";
 const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || "";
@@ -39,6 +41,8 @@ const defaultStore = {
   logoUrl: "assets/logo.jpeg",
   storeHandle: "@serviciosdoxer",
   storeEmail: "perudoxer@gmail.com",
+  storeCurrency: "S/",
+  storeLanguage: "es",
   paymentHolder: "Kimberly Cunyas",
   paymentQrUrl: "",
   services: [
@@ -48,10 +52,21 @@ const defaultStore = {
       category: "General",
       status: "Disponible",
       price: "S/ 25",
+      priceOptions: ["1 mes - S/ 25", "3 meses - S/ 60"],
       description: "Ideal para clientes que quieren una solucion rapida y clara.",
       images: ["assets/servicio1.jpeg"]
     }
   ],
+  coupons: [
+    {
+      id: crypto.randomUUID(),
+      code: "BIENVENIDA10",
+      type: "percent",
+      value: 10,
+      active: 1
+    }
+  ],
+  orders: [],
   testimonials: [
     {
       id: crypto.randomUUID(),
@@ -102,7 +117,10 @@ async function main() {
   );
 
   app.get("/api/public-store", (request, response) => {
-    response.json(readStore(db));
+    const store = readStore(db);
+    delete store.orders;
+    delete store.coupons;
+    response.json(store);
   });
 
   app.post("/api/orders", async (request, response) => {
@@ -113,27 +131,67 @@ async function main() {
     }
 
     const store = readStore(db);
+    const couponResult = applyCoupon(payload.servicePrice, payload.couponCode, store.coupons, store.storeCurrency);
+    const finalPrice = couponResult.finalPrice || payload.servicePrice;
     const message = [
       `Hola ${store.storeName}, quiero comprar este servicio:`,
       "",
       `Servicio: ${payload.serviceName}`,
-      `Precio: ${payload.servicePrice}`,
+      `Precio: ${finalPrice}`,
       `Cliente: ${payload.customerName}`,
       `Telefono: ${payload.customerPhone}`,
       `Detalles: ${payload.details}`,
+      couponResult.appliedCode ? `Cupón: ${couponResult.appliedCode}` : "",
+      payload.paymentProofUrl ? `Comprobante: ${payload.paymentProofUrl}` : "",
       "",
       "Pago en soles. Acepto transferencias de bancos del Peru."
-    ].join("\n");
+    ].filter(Boolean).join("\n");
 
     const whatsappUrl = `https://wa.me/${store.whatsappNumber}?text=${encodeURIComponent(message)}`;
 
+    db.run(
+      "INSERT INTO orders (id, serviceName, servicePrice, finalPrice, customerName, customerPhone, details, couponCode, paymentProofUrl, paymentProofName, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [
+        crypto.randomUUID(),
+        payload.serviceName,
+        payload.servicePrice,
+        finalPrice,
+        payload.customerName,
+        payload.customerPhone,
+        payload.details,
+        couponResult.appliedCode,
+        payload.paymentProofUrl,
+        payload.paymentProofName,
+        new Date().toISOString()
+      ]
+    );
+    persistDatabase(db);
+
     if (emailClient && store.storeEmail) {
-      sendOrderEmail(emailClient, store, payload).catch((error) => {
+      sendOrderEmail(emailClient, store, { ...payload, finalPrice, couponCode: couponResult.appliedCode }).catch((error) => {
         console.error("No se pudo enviar el correo.", error.message);
       });
     }
 
-    response.json({ ok: true, whatsappUrl });
+    sendTelegramNotification(store, { ...payload, finalPrice, couponCode: couponResult.appliedCode, whatsappUrl }).catch((error) => {
+      console.error("No se pudo enviar Telegram.", error.message);
+    });
+
+    response.json({ ok: true, whatsappUrl, finalPrice });
+  });
+
+  app.post("/api/order-proof", upload.single("proof"), (request, response) => {
+    if (!request.file) {
+      response.status(400).json({ error: "proof_required" });
+      return;
+    }
+
+    storeUploadedFile(request.file, cloudinaryEnabled)
+      .then((file) => response.json({ file }))
+      .catch((error) => {
+        console.error("No se pudo subir el comprobante.", error.message);
+        response.status(500).json({ error: "proof_upload_failed" });
+      });
   });
 
   app.get("/api/admin/session", (request, response) => {
@@ -175,6 +233,8 @@ async function main() {
     writeSetting(db, "logoUrl", payload.logoUrl);
     writeSetting(db, "storeHandle", payload.storeHandle);
     writeSetting(db, "storeEmail", payload.storeEmail);
+    writeSetting(db, "storeCurrency", payload.storeCurrency);
+    writeSetting(db, "storeLanguage", payload.storeLanguage);
     writeSetting(db, "paymentHolder", payload.paymentHolder);
     writeSetting(db, "paymentQrUrl", payload.paymentQrUrl);
     persistDatabase(db);
@@ -203,8 +263,8 @@ async function main() {
     }
 
     db.run(
-      "INSERT INTO services (id, name, category, status, price, description, imagesJson) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [crypto.randomUUID(), payload.name, payload.category, payload.status, payload.price, payload.description, JSON.stringify(payload.images)]
+      "INSERT INTO services (id, name, category, status, price, priceOptionsJson, description, imagesJson) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      [crypto.randomUUID(), payload.name, payload.category, payload.status, payload.price, JSON.stringify(payload.priceOptions), payload.description, JSON.stringify(payload.images)]
     );
     persistDatabase(db);
     response.json(readStore(db));
@@ -223,8 +283,8 @@ async function main() {
     }
 
     db.run(
-      "UPDATE services SET name = ?, category = ?, status = ?, price = ?, description = ?, imagesJson = ? WHERE id = ?",
-      [payload.name, payload.category, payload.status, payload.price, payload.description, JSON.stringify(payload.images), request.params.id]
+      "UPDATE services SET name = ?, category = ?, status = ?, price = ?, priceOptionsJson = ?, description = ?, imagesJson = ? WHERE id = ?",
+      [payload.name, payload.category, payload.status, payload.price, JSON.stringify(payload.priceOptions), payload.description, JSON.stringify(payload.images), request.params.id]
     );
     persistDatabase(db);
     response.json(readStore(db));
@@ -232,6 +292,42 @@ async function main() {
 
   app.delete("/api/admin/services/:id", requireAdmin, (request, response) => {
     db.run("DELETE FROM services WHERE id = ?", [request.params.id]);
+    persistDatabase(db);
+    response.json(readStore(db));
+  });
+
+  app.post("/api/admin/coupons", requireAdmin, (request, response) => {
+    const payload = normalizeCouponInput(request.body);
+    if (!payload) {
+      response.status(400).json({ error: "invalid_coupon" });
+      return;
+    }
+
+    db.run(
+      "INSERT INTO coupons (id, code, type, value, active) VALUES (?, ?, ?, ?, ?)",
+      [crypto.randomUUID(), payload.code, payload.type, payload.value, payload.active ? 1 : 0]
+    );
+    persistDatabase(db);
+    response.json(readStore(db));
+  });
+
+  app.put("/api/admin/coupons/:id", requireAdmin, (request, response) => {
+    const payload = normalizeCouponInput(request.body);
+    if (!payload) {
+      response.status(400).json({ error: "invalid_coupon" });
+      return;
+    }
+
+    db.run(
+      "UPDATE coupons SET code = ?, type = ?, value = ?, active = ? WHERE id = ?",
+      [payload.code, payload.type, payload.value, payload.active ? 1 : 0, request.params.id]
+    );
+    persistDatabase(db);
+    response.json(readStore(db));
+  });
+
+  app.delete("/api/admin/coupons/:id", requireAdmin, (request, response) => {
+    db.run("DELETE FROM coupons WHERE id = ?", [request.params.id]);
     persistDatabase(db);
     response.json(readStore(db));
   });
@@ -328,6 +424,7 @@ function ensureSchema(db) {
       category TEXT NOT NULL DEFAULT 'General',
       status TEXT NOT NULL DEFAULT 'Disponible',
       price TEXT NOT NULL,
+      priceOptionsJson TEXT NOT NULL DEFAULT '[]',
       description TEXT NOT NULL,
       imagesJson TEXT NOT NULL DEFAULT '[]'
     );
@@ -342,17 +439,45 @@ function ensureSchema(db) {
     );
   `);
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS coupons (
+      id TEXT PRIMARY KEY,
+      code TEXT NOT NULL UNIQUE,
+      type TEXT NOT NULL DEFAULT 'percent',
+      value REAL NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1
+    );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS orders (
+      id TEXT PRIMARY KEY,
+      serviceName TEXT NOT NULL,
+      servicePrice TEXT NOT NULL,
+      finalPrice TEXT NOT NULL,
+      customerName TEXT NOT NULL,
+      customerPhone TEXT NOT NULL,
+      details TEXT NOT NULL,
+      couponCode TEXT NOT NULL DEFAULT '',
+      paymentProofUrl TEXT NOT NULL DEFAULT '',
+      paymentProofName TEXT NOT NULL DEFAULT '',
+      createdAt TEXT NOT NULL
+    );
+  `);
+
   ensureColumnExists(db, "services", "imagesJson", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumnExists(db, "services", "category", "TEXT NOT NULL DEFAULT 'General'");
   ensureColumnExists(db, "services", "status", "TEXT NOT NULL DEFAULT 'Disponible'");
+  ensureColumnExists(db, "services", "priceOptionsJson", "TEXT NOT NULL DEFAULT '[]'");
 }
 
 function ensureSeedData(db) {
   const settingsCount = scalar(db, "SELECT COUNT(*) FROM settings");
   const servicesCount = scalar(db, "SELECT COUNT(*) FROM services");
   const testimonialsCount = scalar(db, "SELECT COUNT(*) FROM testimonials");
+  const couponsCount = scalar(db, "SELECT COUNT(*) FROM coupons");
 
-  if (settingsCount === 0 && servicesCount === 0 && testimonialsCount === 0) {
+  if (settingsCount === 0 && servicesCount === 0 && testimonialsCount === 0 && couponsCount === 0) {
     resetStore(db);
   }
 }
@@ -374,19 +499,30 @@ function resetStore(db) {
   db.run("DELETE FROM settings");
   db.run("DELETE FROM services");
   db.run("DELETE FROM testimonials");
+  db.run("DELETE FROM coupons");
+  db.run("DELETE FROM orders");
 
   writeSetting(db, "storeName", defaultStore.storeName);
   writeSetting(db, "whatsappNumber", defaultStore.whatsappNumber);
   writeSetting(db, "logoUrl", defaultStore.logoUrl);
   writeSetting(db, "storeHandle", defaultStore.storeHandle);
   writeSetting(db, "storeEmail", defaultStore.storeEmail);
+  writeSetting(db, "storeCurrency", defaultStore.storeCurrency);
+  writeSetting(db, "storeLanguage", defaultStore.storeLanguage);
   writeSetting(db, "paymentHolder", defaultStore.paymentHolder);
   writeSetting(db, "paymentQrUrl", defaultStore.paymentQrUrl);
 
   for (const service of defaultStore.services) {
     db.run(
-      "INSERT INTO services (id, name, category, status, price, description, imagesJson) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [service.id, service.name, service.category || "General", service.status || "Disponible", service.price, service.description, JSON.stringify(service.images)]
+      "INSERT INTO services (id, name, category, status, price, priceOptionsJson, description, imagesJson) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      [service.id, service.name, service.category || "General", service.status || "Disponible", service.price, JSON.stringify(service.priceOptions || []), service.description, JSON.stringify(service.images)]
+    );
+  }
+
+  for (const coupon of defaultStore.coupons) {
+    db.run(
+      "INSERT INTO coupons (id, code, type, value, active) VALUES (?, ?, ?, ?, ?)",
+      [coupon.id, coupon.code, coupon.type, coupon.value, coupon.active ? 1 : 0]
     );
   }
 
@@ -407,16 +543,23 @@ function writeSetting(db, key, value) {
 
 function readStore(db) {
   const settingsRows = rows(db, "SELECT key, value FROM settings");
-  const services = rows(db, "SELECT id, name, category, status, price, description, imagesJson FROM services ORDER BY rowid DESC").map((service) => ({
+  const services = rows(db, "SELECT id, name, category, status, price, priceOptionsJson, description, imagesJson FROM services ORDER BY rowid DESC").map((service) => ({
     id: service.id,
     name: service.name,
     category: service.category || "General",
     status: service.status || "Disponible",
     price: service.price,
+    priceOptions: safeJsonArray(service.priceOptionsJson),
     description: service.description,
     images: safeJsonArray(service.imagesJson)
   }));
   const testimonials = rows(db, "SELECT id, author, role, quote FROM testimonials ORDER BY rowid DESC");
+  const coupons = rows(db, "SELECT id, code, type, value, active FROM coupons ORDER BY rowid DESC").map((coupon) => ({
+    ...coupon,
+    value: Number(coupon.value) || 0,
+    active: Number(coupon.active) === 1
+  }));
+  const orders = rows(db, "SELECT id, serviceName, servicePrice, finalPrice, customerName, customerPhone, details, couponCode, paymentProofUrl, paymentProofName, createdAt FROM orders ORDER BY createdAt DESC");
   const settings = Object.fromEntries(settingsRows.map((row) => [row.key, row.value]));
 
   return {
@@ -425,9 +568,13 @@ function readStore(db) {
     logoUrl: settings.logoUrl || defaultStore.logoUrl,
     storeHandle: settings.storeHandle || defaultStore.storeHandle,
     storeEmail: settings.storeEmail || defaultStore.storeEmail,
+    storeCurrency: settings.storeCurrency || defaultStore.storeCurrency,
+    storeLanguage: settings.storeLanguage || defaultStore.storeLanguage,
     paymentHolder: settings.paymentHolder || defaultStore.paymentHolder,
     paymentQrUrl: settings.paymentQrUrl || defaultStore.paymentQrUrl,
     services,
+    coupons,
+    orders,
     testimonials
   };
 }
@@ -438,6 +585,8 @@ function normalizeSettingsInput(body) {
   const logoUrl = normalizeAssetPath(String(body?.logoUrl || "").trim());
   const storeHandle = String(body?.storeHandle || "").trim();
   const storeEmail = String(body?.storeEmail || "").trim();
+  const storeCurrency = String(body?.storeCurrency || "").trim() || "S/";
+  const storeLanguage = String(body?.storeLanguage || "").trim() || "es";
   const paymentHolder = String(body?.paymentHolder || "").trim();
   const paymentQrUrl = normalizeAssetPath(String(body?.paymentQrUrl || "").trim());
 
@@ -445,7 +594,7 @@ function normalizeSettingsInput(body) {
     return null;
   }
 
-  return { storeName, whatsappNumber, logoUrl, storeHandle, storeEmail, paymentHolder, paymentQrUrl };
+  return { storeName, whatsappNumber, logoUrl, storeHandle, storeEmail, storeCurrency, storeLanguage, paymentHolder, paymentQrUrl };
 }
 
 function normalizeServiceInput(body) {
@@ -453,6 +602,7 @@ function normalizeServiceInput(body) {
   const category = String(body?.category || "").trim() || "General";
   const status = String(body?.status || "").trim() || "Disponible";
   const price = String(body?.price || "").trim();
+  const priceOptions = normalizePriceOptions(body?.priceOptions);
   const description = String(body?.description || "").trim();
   const images = normalizeImageList(body?.images);
 
@@ -460,7 +610,20 @@ function normalizeServiceInput(body) {
     return null;
   }
 
-  return { name, category, status, price, description, images };
+  return { name, category, status, price, priceOptions, description, images };
+}
+
+function normalizeCouponInput(body) {
+  const code = String(body?.code || "").trim().toUpperCase();
+  const type = String(body?.type || "").trim() === "fixed" ? "fixed" : "percent";
+  const value = Number(body?.value || 0);
+  const active = Boolean(body?.active);
+
+  if (!code || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+
+  return { code, type, value, active };
 }
 
 function normalizeTestimonialInput(body) {
@@ -481,12 +644,27 @@ function normalizeOrderInput(body) {
   const customerName = String(body?.customerName || "").trim();
   const customerPhone = String(body?.customerPhone || "").trim();
   const details = String(body?.details || "").trim();
+  const couponCode = String(body?.couponCode || "").trim().toUpperCase();
+  const paymentProofUrl = normalizeAssetPath(String(body?.paymentProofUrl || "").trim());
+  const paymentProofName = String(body?.paymentProofName || "").trim();
 
   if (!serviceName || !servicePrice || !customerName || !customerPhone || !details) {
     return null;
   }
 
-  return { serviceName, servicePrice, customerName, customerPhone, details };
+  return { serviceName, servicePrice, customerName, customerPhone, details, couponCode, paymentProofUrl, paymentProofName };
+}
+
+function normalizePriceOptions(priceOptionsValue) {
+  if (Array.isArray(priceOptionsValue)) {
+    return priceOptionsValue.map((value) => String(value || "").trim()).filter(Boolean);
+  }
+
+  if (typeof priceOptionsValue === "string") {
+    return priceOptionsValue.split("\n").map((value) => String(value || "").trim()).filter(Boolean);
+  }
+
+  return [];
 }
 
 function normalizeImageList(imagesValue) {
@@ -564,13 +742,15 @@ async function sendOrderEmail(emailClient, store, payload) {
   const text = [
     `Negocio: ${store.storeName}`,
     `Servicio: ${payload.serviceName}`,
-    `Precio: ${payload.servicePrice}`,
+    `Precio: ${payload.finalPrice || payload.servicePrice}`,
     `Cliente: ${payload.customerName}`,
     `Telefono del cliente: ${payload.customerPhone}`,
     `Detalles: ${payload.details}`,
+    payload.couponCode ? `Cupón: ${payload.couponCode}` : "",
+    payload.paymentProofUrl ? `Comprobante: ${payload.paymentProofUrl}` : "",
     "",
     "Pagos en soles. Se aceptan bancos del Peru."
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 
   if (emailClient.provider === "resend") {
     const { error } = await emailClient.client.emails.send({
@@ -593,6 +773,78 @@ async function sendOrderEmail(emailClient, store, payload) {
     subject,
     text
   });
+}
+
+async function sendTelegramNotification(store, payload) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    return;
+  }
+
+  const text = [
+    `Nuevo pedido en ${store.storeName}`,
+    `Servicio: ${payload.serviceName}`,
+    `Precio: ${payload.finalPrice || payload.servicePrice}`,
+    `Cliente: ${payload.customerName}`,
+    `Telefono: ${payload.customerPhone}`,
+    `Detalles: ${payload.details}`,
+    payload.couponCode ? `Cupón: ${payload.couponCode}` : "",
+    payload.paymentProofUrl ? `Comprobante: ${payload.paymentProofUrl}` : "",
+    payload.whatsappUrl ? `WhatsApp: ${payload.whatsappUrl}` : ""
+  ].filter(Boolean).join("\n");
+
+  const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: TELEGRAM_CHAT_ID,
+      text
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error("telegram_failed");
+  }
+}
+
+function applyCoupon(priceText, couponCode, coupons, fallbackCurrency) {
+  if (!couponCode) {
+    return { finalPrice: priceText, appliedCode: "" };
+  }
+
+  const coupon = coupons.find((item) => item.active && item.code === couponCode);
+  if (!coupon) {
+    return { finalPrice: priceText, appliedCode: "" };
+  }
+
+  const numericPrice = extractNumericPrice(priceText);
+  if (numericPrice === null) {
+    return { finalPrice: priceText, appliedCode: coupon.code };
+  }
+
+  const discount = coupon.type === "fixed"
+    ? coupon.value
+    : (numericPrice * coupon.value) / 100;
+  const finalNumeric = Math.max(0, numericPrice - discount);
+
+  return {
+    finalPrice: formatPrice(finalNumeric, priceText, fallbackCurrency),
+    appliedCode: coupon.code
+  };
+}
+
+function extractNumericPrice(value) {
+  const matches = String(value || "").replaceAll(",", ".").match(/-?\d+(\.\d+)?/g);
+  if (!matches || !matches.length) {
+    return null;
+  }
+
+  return Number(matches[matches.length - 1]);
+}
+
+function formatPrice(value, template, fallbackCurrency = "S/") {
+  const currency = String(template || "").match(/^[^\d-]+/)?.[0]?.trim() || fallbackCurrency;
+  const formatted = Number.isInteger(value) ? String(value) : value.toFixed(2);
+  return `${currency} ${formatted}`.trim();
 }
 
 function configureCloudinary() {
@@ -636,7 +888,7 @@ function uploadToCloudinary(file) {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: CLOUDINARY_FOLDER,
-        resource_type: "image"
+        resource_type: "auto"
       },
       (error, result) => {
         if (error || !result) {

@@ -96,6 +96,14 @@
         </div>
         <p id="whatsapp-line" class="section-copy"></p>
       </div>
+      <div id="featured-service" class="featured-service"></div>
+      <div class="services-toolbar">
+        <label class="services-search">
+          <span class="visually-hidden">Buscar servicio</span>
+          <input id="services-search" type="search" placeholder="Buscar por nombre, categoría o descripción">
+        </label>
+        <p id="services-results" class="services-results"></p>
+      </div>
       <div id="services-filters" class="services-filters"></div>
       <div id="services-grid" class="services-grid"></div>
     </section>
@@ -118,6 +126,7 @@
         <article class="payment-card">
           <h3>Método de pago</h3>
           <p id="payment-method-copy">Plin por QR. El cliente puede pagar desde cualquier banco compatible con Plin.</p>
+          <button class="ghost-button" type="button" data-copy-payment="true">Copiar datos de pago</button>
         </article>
         <article class="payment-card">
           <h3>Confirmación</h3>
@@ -255,9 +264,14 @@
         <p id="order-payment-copy">Realiza el pago por Plin y luego envía tu comprobante por WhatsApp para confirmar.</p>
         <p id="order-payment-holder" class="hidden"></p>
         <img id="order-payment-qr" class="payment-qr-image hidden" alt="QR de pago Plin" loading="lazy">
+        <button class="ghost-button" type="button" data-copy-payment="true">Copiar datos de pago</button>
       </div>
 
       <form id="order-form" class="form">
+        <label id="order-price-options-wrap" class="hidden">
+          Precio u opcion
+          <select id="order-price-options" name="selectedPrice"></select>
+        </label>
         <label>
           Nombre
           <input name="customerName" type="text" placeholder="Tu nombre" required>
@@ -270,6 +284,15 @@
           Detalles del pedido
           <textarea name="details" rows="4" placeholder="Cuéntame qué necesitas" required></textarea>
         </label>
+        <label>
+          Cupón de descuento
+          <input id="order-coupon-code" name="couponCode" type="text" placeholder="Opcional">
+        </label>
+        <label>
+          Comprobante de pago
+          <input id="order-payment-proof" name="paymentProof" type="file" accept="image/*,.pdf">
+        </label>
+        <p class="helper-text">Puedes subir tu captura de Plin antes de enviar el pedido.</p>
         <button class="primary-button full-width" type="submit">Enviar pedido por WhatsApp</button>
       </form>
     </div>
@@ -303,6 +326,7 @@
         <div class="admin-top-actions">
           <button id="logout-admin" class="ghost-button" type="button">Cerrar sesion</button>
         </div>
+        <div id="admin-stats" class="admin-stats"></div>
 
         <form id="settings-form" class="form compact-form">
           <h3>Configuracion general</h3>
@@ -321,6 +345,21 @@
           <label>
             Correo del negocio
             <input name="storeEmail" type="email" placeholder="perudoxer@gmail.com" required>
+          </label>
+          <label>
+            Moneda principal
+            <select name="storeCurrency">
+              <option value="S/">Soles (S/)</option>
+              <option value="$">Dólares ($)</option>
+              <option value="€">Euros (€)</option>
+            </select>
+          </label>
+          <label>
+            Idioma base
+            <select name="storeLanguage">
+              <option value="es">Español</option>
+              <option value="en">English</option>
+            </select>
           </label>
           <label>
             Nombre del negocio
@@ -368,6 +407,11 @@
             <input name="price" type="text" placeholder="S/ 49" required>
           </label>
           <label>
+            Precios adicionales
+            <textarea id="service-price-options" rows="3" placeholder="Una opción por línea. Ejemplo:&#10;1 mes - S/ 25&#10;3 meses - S/ 60"></textarea>
+          </label>
+          <p class="helper-text">Si un servicio tiene dos precios o más, pon aquí una opción por línea.</p>
+          <label>
             Descripcion
             <textarea name="description" rows="3" placeholder="Explica qué incluye" required></textarea>
           </label>
@@ -403,6 +447,32 @@
           <button id="cancel-testimonial-edit" class="ghost-button full-width hidden" type="button">Cancelar edicion</button>
         </form>
 
+        <form id="coupon-form" class="form compact-form">
+          <h3>Cupones o descuentos</h3>
+          <input name="couponId" type="hidden">
+          <label>
+            Codigo
+            <input name="code" type="text" placeholder="BIENVENIDA10" required>
+          </label>
+          <label>
+            Tipo
+            <select name="type">
+              <option value="percent">Porcentaje</option>
+              <option value="fixed">Monto fijo</option>
+            </select>
+          </label>
+          <label>
+            Valor
+            <input name="value" type="number" min="0" step="0.01" placeholder="10" required>
+          </label>
+          <label class="inline-check">
+            <input name="active" type="checkbox" checked>
+            Cupón activo
+          </label>
+          <button class="primary-button full-width" type="submit">Guardar cupón</button>
+          <button id="cancel-coupon-edit" class="ghost-button full-width hidden" type="button">Cancelar edicion</button>
+        </form>
+
         <section class="admin-services">
           <div class="admin-services-header">
             <h3>Servicios cargados</h3>
@@ -416,6 +486,20 @@
             <h3>Reseñas cargadas</h3>
           </div>
           <div id="admin-testimonials-list" class="admin-services-list"></div>
+        </section>
+
+        <section class="admin-services">
+          <div class="admin-services-header">
+            <h3>Cupones activos</h3>
+          </div>
+          <div id="admin-coupons-list" class="admin-services-list"></div>
+        </section>
+
+        <section class="admin-services">
+          <div class="admin-services-header">
+            <h3>Historial de pedidos</h3>
+          </div>
+          <div id="admin-orders-list" class="admin-services-list"></div>
         </section>
       </section>
     </div>

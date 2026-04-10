@@ -4,20 +4,29 @@ let state = {
   logoUrl: "",
   storeHandle: "",
   storeEmail: "",
+  storeCurrency: "S/",
+  storeLanguage: "es",
   paymentHolder: "",
   paymentQrUrl: "",
   services: [],
-  testimonials: []
+  testimonials: [],
+  coupons: [],
+  orders: []
 };
 
 let selectedService = null;
 let isAdminAuthenticated = false;
 let editingTestimonialId = "";
+let editingCouponId = "";
 let draggedServiceImageIndex = null;
 let activeServiceCategory = "Todas";
+let serviceSearchTerm = "";
 
 const servicesGrid = document.querySelector("#services-grid");
 const servicesFilters = document.querySelector("#services-filters");
+const servicesSearch = document.querySelector("#services-search");
+const servicesResults = document.querySelector("#services-results");
+const featuredService = document.querySelector("#featured-service");
 const testimonialsGrid = document.querySelector("#testimonials-grid");
 const whatsappLine = document.querySelector("#whatsapp-line");
 const brandLogo = document.querySelector("#brand-logo");
@@ -39,15 +48,23 @@ const adminLoginForm = document.querySelector("#admin-login-form");
 const settingsForm = document.querySelector("#settings-form");
 const paymentQrUpload = document.querySelector("#payment-qr-upload");
 const serviceForm = document.querySelector("#service-form");
+const servicePriceOptionsText = document.querySelector("#service-price-options");
 const serviceImagesInput = document.querySelector("#service-images-upload");
 const serviceImagesText = document.querySelector("#service-images");
 const serviceImageManager = document.querySelector("#service-image-manager");
 const testimonialForm = document.querySelector("#testimonial-form");
+const couponForm = document.querySelector("#coupon-form");
 const adminServicesList = document.querySelector("#admin-services-list");
 const testimonialsAdminList = document.querySelector("#admin-testimonials-list");
+const adminCouponsList = document.querySelector("#admin-coupons-list");
+const adminOrdersList = document.querySelector("#admin-orders-list");
 const orderServiceName = document.querySelector("#order-service-name");
 const orderServicePrice = document.querySelector("#order-service-price");
 const orderServiceGallery = document.querySelector("#order-service-gallery");
+const orderPriceOptionsWrap = document.querySelector("#order-price-options-wrap");
+const orderPriceOptions = document.querySelector("#order-price-options");
+const orderCouponCode = document.querySelector("#order-coupon-code");
+const orderPaymentProof = document.querySelector("#order-payment-proof");
 const orderPaymentCopy = document.querySelector("#order-payment-copy");
 const orderPaymentHolder = document.querySelector("#order-payment-holder");
 const orderPaymentQr = document.querySelector("#order-payment-qr");
@@ -55,11 +72,13 @@ const openAdminButton = document.querySelector("#open-admin");
 const openAdminFooterButton = document.querySelector("#open-admin-footer");
 const cancelEditButton = document.querySelector("#cancel-edit");
 const cancelTestimonialButton = document.querySelector("#cancel-testimonial-edit");
+const cancelCouponButton = document.querySelector("#cancel-coupon-edit");
 const resetDataButton = document.querySelector("#reset-data");
 const logoutButton = document.querySelector("#logout-admin");
 const serviceFormTitle = document.querySelector("#service-form-title");
 const adminAuthView = document.querySelector("#admin-auth-view");
 const adminDashboardView = document.querySelector("#admin-dashboard-view");
+const adminStats = document.querySelector("#admin-stats");
 const adminStatus = document.querySelector("#admin-status");
 const loginError = document.querySelector("#login-error");
 
@@ -78,8 +97,10 @@ function bindEvents() {
   adminLoginForm.addEventListener("submit", handleAdminLogin);
   settingsForm.addEventListener("submit", handleSettingsSubmit);
   paymentQrUpload.addEventListener("change", handlePaymentQrUpload);
+  servicesSearch.addEventListener("input", handleServiceSearch);
   serviceForm.addEventListener("submit", handleServiceSubmit);
   testimonialForm.addEventListener("submit", handleTestimonialSubmit);
+  couponForm.addEventListener("submit", handleCouponSubmit);
   serviceImagesInput.addEventListener("change", handleServiceImageUpload);
   serviceImagesText.addEventListener("input", renderServiceImageManager);
   if (serviceImageManager) {
@@ -93,6 +114,7 @@ function bindEvents() {
   openAdminFooterButton.addEventListener("click", () => toggleModal(adminModal, true));
   cancelEditButton.addEventListener("click", resetServiceForm);
   cancelTestimonialButton.addEventListener("click", resetTestimonialForm);
+  cancelCouponButton.addEventListener("click", resetCouponForm);
   resetDataButton.addEventListener("click", handleResetData);
   logoutButton.addEventListener("click", handleAdminLogout);
 }
@@ -145,7 +167,10 @@ async function loadAdminStore() {
     state = await response.json();
     hydrateSettingsForm();
     renderPublicContent();
+    renderAdminStats();
     renderAdminServices();
+    renderAdminCoupons();
+    renderAdminOrders();
     renderAdminTestimonials();
   } catch (error) {
     adminStatus.textContent = "No se pudo cargar el panel.";
@@ -157,6 +182,7 @@ function renderPublicContent() {
   renderFooterContact();
   renderFloatingWhatsapp();
   renderPaymentInfo();
+  renderFeaturedService();
   renderServiceFilters();
   renderPublicServices();
   renderTestimonials();
@@ -181,6 +207,7 @@ function renderServiceFilters() {
 }
 
 function renderBrand() {
+  document.documentElement.lang = state.storeLanguage || "es";
   const hasLogo = Boolean(state.logoUrl);
   brandLogo.classList.toggle("hidden", !hasLogo);
   if (hasLogo) {
@@ -203,10 +230,11 @@ function renderFooterContact() {
 function renderPaymentInfo() {
   const holder = (state.paymentHolder || "").trim();
   const qrUrl = (state.paymentQrUrl || "").trim();
+  const currencyLabel = state.storeCurrency === "$" ? "dólares" : state.storeCurrency === "€" ? "euros" : "soles";
 
   paymentCopy.textContent = holder
-    ? `El pago se realiza por Plin con QR a nombre de ${holder}, y puede enviarse desde cualquier banco del Perú que permita Plin.`
-    : "El pago se realiza por Plin con QR y puede enviarse desde cualquier banco del Perú que permita Plin.";
+    ? `El pago se realiza por Plin con QR a nombre de ${holder}, en ${currencyLabel}, y puede enviarse desde cualquier banco del Perú que permita Plin.`
+    : `El pago se realiza por Plin con QR en ${currencyLabel} y puede enviarse desde cualquier banco del Perú que permita Plin.`;
 
   paymentMethodCopy.textContent = holder
     ? `Plin por QR a nombre de ${holder}. El cliente puede pagar desde cualquier banco compatible con Plin.`
@@ -236,6 +264,69 @@ function renderPaymentQrPreview() {
   }
 }
 
+function pickFeaturedService() {
+  if (!state.services.length) {
+    return null;
+  }
+
+  const statusPriority = {
+    Oferta: 0,
+    Nuevo: 1,
+    Disponible: 2,
+    Agotado: 3
+  };
+
+  return [...state.services].sort((left, right) => {
+    const leftPriority = statusPriority[left.status] ?? 99;
+    const rightPriority = statusPriority[right.status] ?? 99;
+
+    if (leftPriority !== rightPriority) {
+      return leftPriority - rightPriority;
+    }
+
+    return left.name.localeCompare(right.name, "es");
+  })[0];
+}
+
+function renderFeaturedService() {
+  if (!featuredService) {
+    return;
+  }
+
+  const featured = pickFeaturedService();
+
+  if (!featured) {
+    featuredService.innerHTML = "";
+    return;
+  }
+
+  const coverImage = featured.images?.[0] || "";
+  featuredService.innerHTML = `
+    <article class="featured-service-card">
+      <div>
+        <p class="hero-kicker">Servicio destacado</p>
+        <h3>${escapeHtml(featured.name)}</h3>
+        <p class="section-copy">${escapeHtml(featured.description)}</p>
+        <div class="featured-service-meta">
+          <span class="service-category">${escapeHtml(featured.category || "General")}</span>
+          <span class="service-status service-status-${slugifyStatus(featured.status || "Disponible")}">${escapeHtml(featured.status || "Disponible")}</span>
+          <strong class="service-price">${escapeHtml(getServiceDisplayPrice(featured))}</strong>
+        </div>
+        <div class="hero-actions">
+          <button class="primary-button" type="button" data-order-id="${featured.id}">Pedir este servicio</button>
+          <a class="secondary-button" href="#payments">Ver forma de pago</a>
+        </div>
+      </div>
+      ${coverImage ? `<img class="featured-service-image" src="${escapeHtml(coverImage)}" alt="${escapeHtml(featured.name)}" loading="lazy">` : ""}
+    </article>
+  `;
+}
+
+function handleServiceSearch(event) {
+  serviceSearchTerm = event.target.value || "";
+  renderPublicServices();
+}
+
 function renderFloatingWhatsapp() {
   if (!state.whatsappNumber) {
     floatingWhatsapp.classList.add("hidden");
@@ -247,19 +338,40 @@ function renderFloatingWhatsapp() {
 }
 
 function renderPublicServices() {
-  const filteredServices = activeServiceCategory === "Todas"
-    ? state.services
-    : state.services.filter((service) => (service.category || "General") === activeServiceCategory);
+  const normalizedSearch = serviceSearchTerm.trim().toLowerCase();
+  const filteredServices = state.services
+    .filter((service) => activeServiceCategory === "Todas" || (service.category || "General") === activeServiceCategory)
+    .filter((service) => {
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      const haystack = [
+        service.name,
+        service.category,
+        service.description,
+        service.status
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(normalizedSearch);
+    });
 
   if (!state.services.length) {
     servicesGrid.innerHTML = '<div class="empty-state">Todavia no hay servicios publicados.</div>';
+    servicesResults.textContent = "";
     return;
   }
 
   if (!filteredServices.length) {
-    servicesGrid.innerHTML = '<div class="empty-state">No hay servicios en esta categoria todavia.</div>';
+    servicesGrid.innerHTML = '<div class="empty-state">No encontramos servicios con ese filtro o búsqueda.</div>';
+    servicesResults.textContent = "0 resultados";
     return;
   }
+
+  servicesResults.textContent = `${filteredServices.length} resultado${filteredServices.length === 1 ? "" : "s"}`;
 
   servicesGrid.innerHTML = filteredServices
     .map((service) => {
@@ -297,9 +409,14 @@ function renderPublicServices() {
             <p>${escapeHtml(service.description)}</p>
           </div>
           <div class="service-meta">
-            <strong class="service-price">${escapeHtml(service.price)}</strong>
+            <strong class="service-price">${escapeHtml(getServiceDisplayPrice(service))}</strong>
             ${(service.images?.length || 0) > 1 ? `<span class="service-gallery-count">${service.images.length} fotos</span>` : ""}
           </div>
+          ${(service.priceOptions || []).length ? `
+            <div class="price-options-list">
+              ${service.priceOptions.slice(0, 3).map((option) => `<span class="price-option-chip">${escapeHtml(option)}</span>`).join("")}
+            </div>
+          ` : ""}
           <button class="action-button full-width" type="button" data-order-id="${service.id}">Comprar ahora</button>
         </article>
       `;
@@ -355,7 +472,8 @@ function renderAdminServices() {
             <p class="admin-service-status service-status-${slugifyStatus(service.status || "Disponible")}">${escapeHtml(service.status || "Disponible")}</p>
             <p class="admin-service-category">${escapeHtml(service.category || "General")}</p>
             <p>${escapeHtml(service.description)}</p>
-            <strong class="service-price">${escapeHtml(service.price)}</strong>
+            <strong class="service-price">${escapeHtml(getServiceDisplayPrice(service))}</strong>
+            ${(service.priceOptions || []).length ? `<p class="helper-text">${escapeHtml(service.priceOptions.join(" | "))}</p>` : ""}
           </div>
           <div class="admin-service-actions">
             <button class="secondary-button" type="button" data-edit-id="${service.id}">Editar</button>
@@ -364,6 +482,60 @@ function renderAdminServices() {
         </article>
       `;
     })
+    .join("");
+}
+
+function renderAdminCoupons() {
+  if (!adminCouponsList) {
+    return;
+  }
+
+  if (!state.coupons.length) {
+    adminCouponsList.innerHTML = '<div class="empty-state">No hay cupones configurados.</div>';
+    return;
+  }
+
+  adminCouponsList.innerHTML = state.coupons
+    .map((coupon) => `
+      <article class="admin-service-item">
+        <div>
+          <h3>${escapeHtml(coupon.code)}</h3>
+          <p>${coupon.type === "percent" ? `${coupon.value}% de descuento` : `${state.storeCurrency || "S/"} ${coupon.value} de descuento`}</p>
+          <p class="admin-service-category">${coupon.active ? "Activo" : "Inactivo"}</p>
+        </div>
+        <div class="admin-service-actions">
+          <button class="secondary-button" type="button" data-edit-coupon-id="${coupon.id}">Editar</button>
+          <button class="danger-button" type="button" data-delete-coupon-id="${coupon.id}">Eliminar</button>
+        </div>
+      </article>
+    `)
+    .join("");
+}
+
+function renderAdminOrders() {
+  if (!adminOrdersList) {
+    return;
+  }
+
+  if (!state.orders.length) {
+    adminOrdersList.innerHTML = '<div class="empty-state">Todavía no hay pedidos guardados.</div>';
+    return;
+  }
+
+  adminOrdersList.innerHTML = state.orders
+    .map((order) => `
+      <article class="admin-service-item">
+        <div>
+          <h3>${escapeHtml(order.serviceName)}</h3>
+          <p><strong>Cliente:</strong> ${escapeHtml(order.customerName)} | ${escapeHtml(order.customerPhone)}</p>
+          <p><strong>Precio:</strong> ${escapeHtml(order.finalPrice || order.servicePrice)}</p>
+          ${order.couponCode ? `<p><strong>Cupón:</strong> ${escapeHtml(order.couponCode)}</p>` : ""}
+          <p>${escapeHtml(order.details)}</p>
+          <p class="helper-text">${escapeHtml(formatOrderDate(order.createdAt))}</p>
+          ${order.paymentProofUrl ? `<a class="secondary-button" href="${escapeHtml(order.paymentProofUrl)}" target="_blank" rel="noopener noreferrer">Ver comprobante</a>` : ""}
+        </div>
+      </article>
+    `)
     .join("");
 }
 
@@ -392,11 +564,41 @@ function renderAdminTestimonials() {
     .join("");
 }
 
+function renderAdminStats() {
+  if (!adminStats) {
+    return;
+  }
+
+  const availableServices = state.services.filter((service) => (service.status || "Disponible") !== "Agotado").length;
+  const featured = pickFeaturedService();
+
+  adminStats.innerHTML = `
+    <article class="metric">
+      <strong>${state.services.length}</strong>
+      <span>Servicios cargados</span>
+    </article>
+    <article class="metric">
+      <strong>${availableServices}</strong>
+      <span>Servicios activos</span>
+    </article>
+    <article class="metric">
+      <strong>${state.orders.length}</strong>
+      <span>Pedidos guardados</span>
+    </article>
+    <article class="metric">
+      <strong>${state.coupons.filter((coupon) => coupon.active).length}</strong>
+      <span>Cupones activos</span>
+    </article>
+  `;
+}
+
 function hydrateSettingsForm() {
   settingsForm.whatsappNumber.value = state.whatsappNumber || "";
   settingsForm.logoUrl.value = state.logoUrl || "";
   settingsForm.storeHandle.value = state.storeHandle || "";
   settingsForm.storeEmail.value = state.storeEmail || "";
+  settingsForm.storeCurrency.value = state.storeCurrency || "S/";
+  settingsForm.storeLanguage.value = state.storeLanguage || "es";
   settingsForm.storeName.value = state.storeName || "";
   settingsForm.paymentHolder.value = state.paymentHolder || "";
   settingsForm.paymentQrUrl.value = state.paymentQrUrl || "";
@@ -409,8 +611,11 @@ function handleDocumentClick(event) {
   const deleteId = event.target.getAttribute("data-delete-id");
   const editTestimonialId = event.target.getAttribute("data-edit-testimonial-id");
   const deleteTestimonialId = event.target.getAttribute("data-delete-testimonial-id");
+  const editCouponId = event.target.getAttribute("data-edit-coupon-id");
+  const deleteCouponId = event.target.getAttribute("data-delete-coupon-id");
   const serviceThumb = event.target.closest("[data-service-thumb='true']");
   const categoryFilter = event.target.closest("[data-service-category]");
+  const copyPaymentButton = event.target.closest("[data-copy-payment='true']");
 
   if (event.target.hasAttribute("data-close-modal")) {
     toggleModal(orderModal, false);
@@ -432,6 +637,11 @@ function handleDocumentClick(event) {
     return;
   }
 
+  if (copyPaymentButton) {
+    copyPaymentData();
+    return;
+  }
+
   if (orderId) {
     openOrderModal(orderId);
   }
@@ -450,6 +660,28 @@ function handleDocumentClick(event) {
 
   if (deleteTestimonialId) {
     deleteTestimonial(deleteTestimonialId);
+  }
+
+  if (editCouponId) {
+    hydrateCouponForm(editCouponId);
+  }
+
+  if (deleteCouponId) {
+    deleteCoupon(deleteCouponId);
+  }
+}
+
+async function copyPaymentData() {
+  const holder = (state.paymentHolder || "").trim();
+  const paymentText = holder
+    ? `Pago por Plin a nombre de ${holder}. Luego envia tu comprobante por WhatsApp para confirmar el pedido.`
+    : "Pago por Plin. Luego envia tu comprobante por WhatsApp para confirmar el pedido.";
+
+  try {
+    await navigator.clipboard.writeText(paymentText);
+    adminStatus.textContent = "Datos de pago copiados.";
+  } catch (error) {
+    adminStatus.textContent = "No se pudieron copiar los datos de pago.";
   }
 }
 
@@ -475,9 +707,14 @@ function openOrderModal(orderId) {
   }
 
   orderServiceName.textContent = selectedService.name;
-  orderServicePrice.textContent = `Precio actual: ${selectedService.price}`;
+  orderServicePrice.textContent = `Precio actual: ${getServiceDisplayPrice(selectedService)}`;
   orderServiceGallery.innerHTML = (selectedService.images || [])
     .map((image) => `<img class="order-gallery-image" src="${escapeHtml(image)}" alt="${escapeHtml(selectedService.name)}" loading="lazy">`)
+    .join("");
+  const priceOptions = getPriceOptions(selectedService);
+  orderPriceOptionsWrap.classList.toggle("hidden", priceOptions.length <= 1);
+  orderPriceOptions.innerHTML = priceOptions
+    .map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`)
     .join("");
   orderPaymentCopy.textContent = state.paymentHolder
     ? `Paga por Plin a nombre de ${state.paymentHolder} y luego envía tu comprobante por WhatsApp para confirmar este pedido.`
@@ -491,6 +728,8 @@ function openOrderModal(orderId) {
     orderPaymentQr.removeAttribute("src");
   }
   orderForm.reset();
+  orderCouponCode.value = "";
+  orderPaymentProof.value = "";
   toggleModal(orderModal, true);
 }
 
@@ -505,11 +744,27 @@ function hydrateServiceForm(serviceId) {
   serviceForm.category.value = service.category || "General";
   serviceForm.status.value = service.status || "Disponible";
   serviceForm.price.value = service.price;
+  servicePriceOptionsText.value = (service.priceOptions || []).join("\n");
   serviceForm.description.value = service.description;
   serviceImagesText.value = (service.images || []).join("\n");
   renderServiceImageManager();
   serviceFormTitle.textContent = "Editar servicio";
   cancelEditButton.classList.remove("hidden");
+}
+
+function hydrateCouponForm(couponId) {
+  const coupon = state.coupons.find((item) => item.id === couponId);
+  if (!coupon) {
+    return;
+  }
+
+  editingCouponId = coupon.id;
+  couponForm.couponId.value = coupon.id;
+  couponForm.code.value = coupon.code;
+  couponForm.type.value = coupon.type || "percent";
+  couponForm.value.value = coupon.value;
+  couponForm.active.checked = Boolean(coupon.active);
+  cancelCouponButton.classList.remove("hidden");
 }
 
 function hydrateTestimonialForm(testimonialId) {
@@ -535,13 +790,18 @@ function handleOrderSubmit(event) {
   const customerName = formData.get("customerName")?.toString().trim();
   const customerPhone = formData.get("customerPhone")?.toString().trim();
   const details = formData.get("details")?.toString().trim();
+  const selectedPrice = formData.get("selectedPrice")?.toString().trim() || getPriceOptions(selectedService)[0] || selectedService.price;
+  const couponCode = formData.get("couponCode")?.toString().trim() || "";
+  const proofFile = orderPaymentProof?.files?.[0] || null;
 
   submitOrder({
     serviceName: selectedService.name,
-    servicePrice: selectedService.price,
+    servicePrice: selectedPrice,
     customerName,
     customerPhone,
-    details
+    details,
+    couponCode,
+    proofFile
   });
 }
 
@@ -581,6 +841,7 @@ async function handleAdminLogout() {
     isAdminAuthenticated = false;
     resetServiceForm();
     resetTestimonialForm();
+    resetCouponForm();
     await syncAdminView();
   }
 }
@@ -599,6 +860,8 @@ async function handleSettingsSubmit(event) {
         logoUrl: settingsForm.logoUrl.value.trim(),
         storeHandle: settingsForm.storeHandle.value.trim(),
         storeEmail: settingsForm.storeEmail.value.trim(),
+        storeCurrency: settingsForm.storeCurrency.value.trim(),
+        storeLanguage: settingsForm.storeLanguage.value.trim(),
         paymentHolder: settingsForm.paymentHolder.value.trim(),
         paymentQrUrl: settingsForm.paymentQrUrl.value.trim()
       })
@@ -611,7 +874,10 @@ async function handleSettingsSubmit(event) {
     state = await response.json();
     hydrateSettingsForm();
     renderPublicContent();
+    renderAdminStats();
     renderAdminServices();
+    renderAdminCoupons();
+    renderAdminOrders();
     renderAdminTestimonials();
   } catch (error) {
     adminStatus.textContent = "No se pudo guardar la configuracion.";
@@ -661,6 +927,7 @@ async function handleServiceSubmit(event) {
     category: formData.get("category")?.toString().trim() || "General",
     status: formData.get("status")?.toString().trim() || "Disponible",
     price: formData.get("price")?.toString().trim() || "",
+    priceOptions: servicePriceOptionsText.value.split("\n").map((line) => line.trim()).filter(Boolean),
     description: formData.get("description")?.toString().trim() || "",
     images: serviceImagesText.value.split("\n").map((line) => line.trim()).filter(Boolean)
   };
@@ -687,7 +954,10 @@ async function handleServiceSubmit(event) {
 
     state = await response.json();
     renderPublicContent();
+    renderAdminStats();
     renderAdminServices();
+    renderAdminCoupons();
+    renderAdminOrders();
     resetServiceForm();
   } catch (error) {
     adminStatus.textContent = "No se pudo guardar el servicio.";
@@ -728,10 +998,55 @@ async function handleTestimonialSubmit(event) {
 
     state = await response.json();
     renderPublicContent();
+    renderAdminStats();
+    renderAdminCoupons();
+    renderAdminOrders();
     renderAdminTestimonials();
     resetTestimonialForm();
   } catch (error) {
     adminStatus.textContent = "No se pudo guardar la reseña.";
+  }
+}
+
+async function handleCouponSubmit(event) {
+  event.preventDefault();
+
+  const formData = new FormData(couponForm);
+  const payload = {
+    code: formData.get("code")?.toString().trim() || "",
+    type: formData.get("type")?.toString().trim() || "percent",
+    value: Number(formData.get("value") || 0),
+    active: couponForm.active.checked
+  };
+
+  if (!payload.code || !payload.value) {
+    adminStatus.textContent = "Completa código y valor del cupón.";
+    return;
+  }
+
+  const endpoint = editingCouponId
+    ? `/api/admin/coupons/${encodeURIComponent(editingCouponId)}`
+    : "/api/admin/coupons";
+  const method = editingCouponId ? "PUT" : "POST";
+
+  try {
+    const response = await fetch(endpoint, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error("coupon");
+    }
+
+    state = await response.json();
+    renderAdminStats();
+    renderAdminCoupons();
+    resetCouponForm();
+  } catch (error) {
+    adminStatus.textContent = "No se pudo guardar el cupón.";
   }
 }
 
@@ -781,7 +1096,10 @@ async function deleteService(serviceId) {
 
     state = await response.json();
     renderPublicContent();
+    renderAdminStats();
     renderAdminServices();
+    renderAdminCoupons();
+    renderAdminOrders();
     resetServiceForm();
   } catch (error) {
     adminStatus.textContent = "No se pudo eliminar el servicio.";
@@ -801,10 +1119,33 @@ async function deleteTestimonial(testimonialId) {
 
     state = await response.json();
     renderPublicContent();
+    renderAdminStats();
+    renderAdminCoupons();
+    renderAdminOrders();
     renderAdminTestimonials();
     resetTestimonialForm();
   } catch (error) {
     adminStatus.textContent = "No se pudo eliminar la reseña.";
+  }
+}
+
+async function deleteCoupon(couponId) {
+  try {
+    const response = await fetch(`/api/admin/coupons/${encodeURIComponent(couponId)}`, {
+      method: "DELETE",
+      credentials: "same-origin"
+    });
+
+    if (!response.ok) {
+      throw new Error("delete_coupon");
+    }
+
+    state = await response.json();
+    renderAdminStats();
+    renderAdminCoupons();
+    resetCouponForm();
+  } catch (error) {
+    adminStatus.textContent = "No se pudo eliminar el cupón.";
   }
 }
 
@@ -822,10 +1163,14 @@ async function handleResetData() {
     state = await response.json();
     hydrateSettingsForm();
     renderPublicContent();
+    renderAdminStats();
     renderAdminServices();
+    renderAdminCoupons();
+    renderAdminOrders();
     renderAdminTestimonials();
     resetServiceForm();
     resetTestimonialForm();
+    resetCouponForm();
   } catch (error) {
     adminStatus.textContent = "No se pudo restaurar la demo.";
   }
@@ -835,10 +1180,39 @@ async function submitOrder(payload) {
   const pendingWindow = window.open("about:blank", "perudoxer-whatsapp");
 
   try {
+    let paymentProofUrl = "";
+    let paymentProofName = "";
+
+    if (payload.proofFile) {
+      const proofData = new FormData();
+      proofData.append("proof", payload.proofFile);
+      const uploadResponse = await fetch("/api/order-proof", {
+        method: "POST",
+        body: proofData
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("proof_upload");
+      }
+
+      const uploadResult = await uploadResponse.json();
+      paymentProofUrl = uploadResult.file?.url || "";
+      paymentProofName = uploadResult.file?.name || "";
+    }
+
     const response = await fetch("/api/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        serviceName: payload.serviceName,
+        servicePrice: payload.servicePrice,
+        customerName: payload.customerName,
+        customerPhone: payload.customerPhone,
+        details: payload.details,
+        couponCode: payload.couponCode,
+        paymentProofUrl,
+        paymentProofName
+      })
     });
 
     if (!response.ok) {
@@ -866,6 +1240,7 @@ async function submitOrder(payload) {
 
 function resetServiceForm() {
   serviceForm.reset();
+  servicePriceOptionsText.value = "";
   serviceImagesText.value = "";
   renderServiceImageManager();
   serviceForm.serviceId.value = "";
@@ -1009,6 +1384,13 @@ function resetTestimonialForm() {
   cancelTestimonialButton.classList.add("hidden");
 }
 
+function resetCouponForm() {
+  couponForm.reset();
+  editingCouponId = "";
+  couponForm.couponId.value = "";
+  cancelCouponButton.classList.add("hidden");
+}
+
 function toggleModal(modal, show) {
   modal.classList.toggle("hidden", !show);
   modal.setAttribute("aria-hidden", String(!show));
@@ -1016,6 +1398,29 @@ function toggleModal(modal, show) {
 
 function sanitizePhone(phone) {
   return phone.replace(/[^\d]/g, "");
+}
+
+function getPriceOptions(service) {
+  const options = Array.isArray(service?.priceOptions) ? service.priceOptions.filter(Boolean) : [];
+  return options.length ? options : [service?.price].filter(Boolean);
+}
+
+function getServiceDisplayPrice(service) {
+  const options = getPriceOptions(service);
+  return options.length > 1 ? `Desde ${options[0]}` : (options[0] || service.price || "");
+}
+
+function formatOrderDate(value) {
+  if (!value) {
+    return "Sin fecha";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString("es-PE");
 }
 
 function escapeHtml(value) {
