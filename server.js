@@ -124,10 +124,8 @@ async function main() {
 
     const whatsappUrl = `https://wa.me/${store.whatsappNumber}?text=${encodeURIComponent(message)}`;
 
-    let emailSent = false;
     if (transporter && store.storeEmail) {
-      try {
-        await transporter.sendMail({
+      transporter.sendMail({
           from: SMTP_FROM,
           to: store.storeEmail,
           subject: `Nueva solicitud para ${store.storeName}: ${payload.serviceName}`,
@@ -141,14 +139,13 @@ async function main() {
             "",
             "Pagos en soles. Se aceptan bancos del Peru."
           ].join("\n")
+        })
+        .catch((error) => {
+          console.error("No se pudo enviar el correo.", error.message);
         });
-        emailSent = true;
-      } catch (error) {
-        console.error("No se pudo enviar el correo.", error.message);
-      }
     }
 
-    response.json({ ok: true, whatsappUrl, emailSent });
+    response.json({ ok: true, whatsappUrl });
   });
 
   app.get("/api/admin/session", (request, response) => {
