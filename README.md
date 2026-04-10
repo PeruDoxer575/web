@@ -35,9 +35,16 @@ Desde el panel puedes:
 - editar o eliminar servicios
 - agregar, editar y eliminar reseñas
 
-## Gmail
+## Correo
 
-Para Gmail usa App Password en `SMTP_PASS`, no tu clave normal.
+En Railway te conviene usar `Resend` por API:
+
+- `RESEND_API_KEY`
+- `RESEND_FROM`
+
+El proyecto usa Resend primero y SMTP como respaldo.
+
+Para pruebas locales, si quieres, tambien puedes usar Gmail con App Password en `SMTP_PASS`.
 
 ## Railway
 
@@ -51,6 +58,8 @@ Pasos recomendados:
    `ADMIN_USERNAME`
    `ADMIN_PASSWORD`
    `SESSION_SECRET`
+   `RESEND_API_KEY`
+   `RESEND_FROM`
    `SMTP_HOST`
    `SMTP_PORT`
    `SMTP_USER`

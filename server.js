@@ -7,6 +7,7 @@ const multer = require("multer");
 const { v2: cloudinary } = require("cloudinary");
 const initSqlJs = require("sql.js");
 const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 require("dotenv").config();
 
 const PORT = Number(process.env.PORT || 3000);
@@ -18,6 +19,8 @@ const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
 const SMTP_USER = process.env.SMTP_USER || "";
 const SMTP_PASS = process.env.SMTP_PASS || "";
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER || "";
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+const RESEND_FROM = process.env.RESEND_FROM || "";
 const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || "";
 const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || "";
 const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || "";
@@ -76,7 +79,7 @@ async function main() {
   const SQL = await initSqlJs();
   const app = express();
   const db = loadDatabase(SQL);
-  const transporter = createTransporter();
+  const emailClient = createEmailClient();
   const cloudinaryEnabled = configureCloudinary();
 
   ensureSchema(db);
@@ -124,25 +127,10 @@ async function main() {
 
     const whatsappUrl = `https://wa.me/${store.whatsappNumber}?text=${encodeURIComponent(message)}`;
 
-    if (transporter && store.storeEmail) {
-      transporter.sendMail({
-          from: SMTP_FROM,
-          to: store.storeEmail,
-          subject: `Nueva solicitud para ${store.storeName}: ${payload.serviceName}`,
-          text: [
-            `Negocio: ${store.storeName}`,
-            `Servicio: ${payload.serviceName}`,
-            `Precio: ${payload.servicePrice}`,
-            `Cliente: ${payload.customerName}`,
-            `Telefono del cliente: ${payload.customerPhone}`,
-            `Detalles: ${payload.details}`,
-            "",
-            "Pagos en soles. Se aceptan bancos del Peru."
-          ].join("\n")
-        })
-        .catch((error) => {
-          console.error("No se pudo enviar el correo.", error.message);
-        });
+    if (emailClient && store.storeEmail) {
+      sendOrderEmail(emailClient, store, payload).catch((error) => {
+        console.error("No se pudo enviar el correo.", error.message);
+      });
     }
 
     response.json({ ok: true, whatsappUrl });
@@ -543,19 +531,67 @@ function ensureColumnExists(db, tableName, columnName, definition) {
   }
 }
 
-function createTransporter() {
+function createEmailClient() {
+  if (RESEND_API_KEY && RESEND_FROM) {
+    return {
+      provider: "resend",
+      client: new Resend(RESEND_API_KEY),
+      from: RESEND_FROM
+    };
+  }
+
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !SMTP_FROM) {
     return null;
   }
 
-  return nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_PORT === 465,
-    auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS
+  return {
+    provider: "smtp",
+    client: nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS
+      }
+    }),
+    from: SMTP_FROM
+  };
+}
+
+async function sendOrderEmail(emailClient, store, payload) {
+  const subject = `Nueva solicitud para ${store.storeName}: ${payload.serviceName}`;
+  const text = [
+    `Negocio: ${store.storeName}`,
+    `Servicio: ${payload.serviceName}`,
+    `Precio: ${payload.servicePrice}`,
+    `Cliente: ${payload.customerName}`,
+    `Telefono del cliente: ${payload.customerPhone}`,
+    `Detalles: ${payload.details}`,
+    "",
+    "Pagos en soles. Se aceptan bancos del Peru."
+  ].join("\n");
+
+  if (emailClient.provider === "resend") {
+    const { error } = await emailClient.client.emails.send({
+      from: emailClient.from,
+      to: [store.storeEmail],
+      subject,
+      text
+    });
+
+    if (error) {
+      throw new Error(error.message || "resend_failed");
     }
+
+    return;
+  }
+
+  await emailClient.client.sendMail({
+    from: emailClient.from,
+    to: store.storeEmail,
+    subject,
+    text
   });
 }
 
