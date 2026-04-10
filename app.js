@@ -832,7 +832,7 @@ async function handleResetData() {
 }
 
 async function submitOrder(payload) {
-  const pendingWindow = window.open("", "_blank", "noopener,noreferrer");
+  const pendingWindow = window.open("about:blank", "perudoxer-whatsapp");
 
   try {
     const response = await fetch("/api/orders", {
@@ -848,9 +848,9 @@ async function submitOrder(payload) {
     const data = await response.json();
     if (data.whatsappUrl) {
       if (pendingWindow) {
-        pendingWindow.location.href = data.whatsappUrl;
+        pendingWindow.location.replace(data.whatsappUrl);
       } else {
-        window.location.href = data.whatsappUrl;
+        window.open(data.whatsappUrl, "_blank");
       }
     } else if (pendingWindow) {
       pendingWindow.close();
