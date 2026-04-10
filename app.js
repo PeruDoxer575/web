@@ -832,6 +832,8 @@ async function handleResetData() {
 }
 
 async function submitOrder(payload) {
+  const pendingWindow = window.open("", "_blank", "noopener,noreferrer");
+
   try {
     const response = await fetch("/api/orders", {
       method: "POST",
@@ -845,10 +847,19 @@ async function submitOrder(payload) {
 
     const data = await response.json();
     if (data.whatsappUrl) {
-      window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
+      if (pendingWindow) {
+        pendingWindow.location.href = data.whatsappUrl;
+      } else {
+        window.location.href = data.whatsappUrl;
+      }
+    } else if (pendingWindow) {
+      pendingWindow.close();
     }
     toggleModal(orderModal, false);
   } catch (error) {
+    if (pendingWindow) {
+      pendingWindow.close();
+    }
     adminStatus.textContent = "No se pudo procesar el pedido.";
   }
 }
