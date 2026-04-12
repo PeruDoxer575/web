@@ -90,6 +90,8 @@ Además del texto, ahora el bot tiene menú con botones para:
 - cambiar WhatsApp, correo, titular Plin y lema desde Telegram
 - editar valor y tipo de cupones desde botones
 - recibir alerta de pedido con botón `Atender ahora`
+- usar respuestas rápidas desde pedidos:
+  `Pago recibido`, `Te escribo en breve`, `Envíame captura`
 
 En edición de fotos:
 

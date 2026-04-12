@@ -209,10 +209,10 @@ async function handleTelegramAdminCommand(chatId, text, { db, persistDatabase })
   if (command === "/start" || command === "/menu" || command === "/ayuda") {
     await sendTelegramBotMessage(
       chatId,
-      "Bot admin de PERUDOXER",
+      "Panel admin PERUDOXER\n\nElige una opción y movemos todo desde aquí.",
       {
         inline_keyboard: [
-          [{ text: "Productos", callback_data: "menu_products" }, { text: "Agregar producto", callback_data: "menu_add_service" }],
+          [{ text: "Productos", callback_data: "menu_products" }, { text: "Agregar", callback_data: "menu_add_service" }],
           [{ text: "Cupones", callback_data: "menu_coupons" }, { text: "Pedidos", callback_data: "menu_orders" }],
           [{ text: "Resumen", callback_data: "menu_summary" }, { text: "Ajustes", callback_data: "menu_settings" }]
         ]
@@ -925,17 +925,44 @@ async function handleTelegramAdminCallback(callbackQuery, { db, persistDatabase 
     return;
   }
 
+  if (data.startsWith("order_reply:")) {
+    const [, orderId, replyType] = data.split(":");
+    const store = readStore(db);
+    const order = store.orders.find((item) => item.id === orderId);
+
+    if (!order) {
+      await answerTelegramCallback(callbackId, "Pedido no encontrado");
+      return;
+    }
+
+    const replyMessage = buildQuickReplyMessage(replyType, order, store);
+    if (!replyMessage) {
+      await answerTelegramCallback(callbackId, "Respuesta no disponible");
+      return;
+    }
+
+    const whatsappUrl = `https://wa.me/${sanitizePhone(order.customerPhone)}?text=${encodeURIComponent(replyMessage)}`;
+    await answerTelegramCallback(callbackId, "Respuesta lista");
+    await sendTelegramBotMessage(chatId, "Respuesta rápida preparada:", {
+      inline_keyboard: [
+        [{ text: "Abrir WhatsApp", url: whatsappUrl }],
+        [{ text: "Volver a pedidos", callback_data: "menu_orders" }]
+      ]
+    });
+    return;
+  }
+
   await answerTelegramCallback(callbackId, "Acción no disponible");
 }
 
 async function sendTelegramProductsMenu(chatId, db) {
   const store = readStore(db);
   if (!store.services.length) {
-    await sendTelegramBotMessage(chatId, "No hay productos cargados.");
+    await sendTelegramBotMessage(chatId, "No hay productos cargados todavía.");
     return;
   }
 
-  await sendTelegramBotMessage(chatId, "Productos disponibles:", {
+  await sendTelegramBotMessage(chatId, "Estos son tus productos activos para mover rápido:", {
     inline_keyboard: [
       ...store.services.slice(0, 12).map((service) => ([
         { text: `${service.name.slice(0, 24)} | ${service.status}`, callback_data: `product_view:${service.id}` }
@@ -1028,13 +1055,13 @@ async function sendTelegramCouponsMenu(chatId, db) {
 
   rows.unshift([{ text: "Crear cupón", callback_data: "coupon_add" }]);
   rows.push([{ text: "Volver al menú", callback_data: "menu_back" }]);
-  await sendTelegramBotMessage(chatId, "Panel de cupones:", { inline_keyboard: rows });
+  await sendTelegramBotMessage(chatId, "Panel de cupones listo para mover descuentos:", { inline_keyboard: rows });
 }
 
 async function sendTelegramOrders(chatId, db) {
   const store = readStore(db);
   if (!store.orders.length) {
-    await sendTelegramBotMessage(chatId, "No hay pedidos registrados.");
+    await sendTelegramBotMessage(chatId, "Todavía no hay pedidos registrados.");
     return;
   }
 
@@ -1045,6 +1072,15 @@ async function sendTelegramOrders(chatId, db) {
         { text: "Atendido", callback_data: `order_status:${order.id}:atendido` }
       ]
     ];
+    buttons.push(
+      [
+        { text: "Pago recibido", callback_data: `order_reply:${order.id}:paid` },
+        { text: "Te escribo en breve", callback_data: `order_reply:${order.id}:soon` }
+      ],
+      [
+        { text: "Envíame captura", callback_data: `order_reply:${order.id}:proof` }
+      ]
+    );
     if (order.paymentProofUrl) {
       buttons.push([{ text: "Ver comprobante", url: order.paymentProofUrl }]);
     }
@@ -1052,6 +1088,7 @@ async function sendTelegramOrders(chatId, db) {
     await sendTelegramBotMessage(
       chatId,
       [
+        "Nuevo movimiento",
         `Servicio: ${order.serviceName}`,
         `Cliente: ${order.customerName}`,
         `Precio: ${order.finalPrice || order.servicePrice}`,
@@ -1074,6 +1111,7 @@ async function sendTelegramSummary(chatId, db) {
   await sendTelegramBotMessage(
     chatId,
     [
+      "Resumen rápido",
       `Servicios: ${store.services.length}`,
       `Pedidos: ${store.orders.length}`,
       `Atendidos: ${store.orders.filter((order) => order.status === "atendido").length}`,
@@ -1092,6 +1130,7 @@ async function sendTelegramSettingsMenu(chatId, db) {
   await sendTelegramBotMessage(
     chatId,
     [
+      "Ajustes del negocio",
       `WhatsApp: ${store.whatsappNumber}`,
       `Correo: ${store.storeEmail}`,
       `Titular Plin: ${store.paymentHolder || "No configurado"}`,
@@ -1129,6 +1168,25 @@ async function sendTelegramBotMessage(chatId, text, replyMarkup) {
       reply_markup: replyMarkup
     })
   });
+}
+
+function buildQuickReplyMessage(replyType, order, store) {
+  const customerName = order.customerName || "cliente";
+  const serviceName = order.serviceName || "tu pedido";
+
+  if (replyType === "paid") {
+    return `Hola ${customerName}, pago recibido para ${serviceName}. En un momento seguimos con tu atención por ${store.storeName}.`;
+  }
+
+  if (replyType === "soon") {
+    return `Hola ${customerName}, ya vi tu solicitud de ${serviceName}. Te escribo en breve para continuar con la coordinación.`;
+  }
+
+  if (replyType === "proof") {
+    return `Hola ${customerName}, para confirmar ${serviceName} envíame por favor tu captura o comprobante de pago.`;
+  }
+
+  return "";
 }
 
 async function answerTelegramCallback(callbackId, text) {
