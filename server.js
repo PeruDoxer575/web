@@ -96,7 +96,7 @@ const upload = multer({
 
 const telegramBotSessions = new Map();
 
-function startTelegramAdminBot({ db, persistDatabase }) {
+function startTelegramAdminBot({ db, persistDatabase, cloudinaryEnabled }) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_IDS.length) {
     return;
   }
@@ -114,7 +114,7 @@ function startTelegramAdminBot({ db, persistDatabase }) {
 
       for (const update of data.result) {
         offset = update.update_id + 1;
-        await handleTelegramAdminUpdate(update, { db, persistDatabase });
+        await handleTelegramAdminUpdate(update, { db, persistDatabase, cloudinaryEnabled });
       }
     } catch (error) {
       console.error("Bot de Telegram admin detenido momentáneamente.", error.message);
@@ -148,7 +148,7 @@ async function handleTelegramAdminUpdate(update, context) {
   }
 
   if (session?.mode === "add_service") {
-    await continueAddServiceWizard(chatId, text, session, context);
+    await continueAddServiceWizard(chatId, message, session, context);
   }
 }
 
@@ -263,8 +263,8 @@ async function handleTelegramAdminCommand(chatId, text, { db, persistDatabase })
   await sendTelegramBotMessage(chatId, "No entendí ese comando. Usa /ayuda");
 }
 
-async function continueAddServiceWizard(chatId, text, session, { db, persistDatabase }) {
-  const value = text.trim();
+async function continueAddServiceWizard(chatId, message, session, { db, persistDatabase, cloudinaryEnabled }) {
+  const value = String(message.text || "").trim();
   const data = session.data;
 
   if (session.step === "name") {
@@ -307,14 +307,30 @@ async function continueAddServiceWizard(chatId, text, session, { db, persistData
   if (session.step === "description") {
     data.description = value;
     session.step = "images";
-    await sendTelegramBotMessage(chatId, "7. URLs de imágenes separadas por |. Si no tienes aún, responde: no");
+    data.images = [];
+    await sendTelegramBotMessage(chatId, "7. Envíame una o varias fotos del producto por aquí mismo. Cuando termines, escribe: listo. Si no quieres agregar imágenes ahora, responde: no");
     return;
   }
 
   if (session.step === "images") {
-    data.images = value.toLowerCase() === "no"
-      ? []
-      : value.split("|").map((item) => item.trim()).filter(Boolean);
+    if (message.photo?.length || message.document) {
+      const uploadedImage = await storeTelegramMedia(message, cloudinaryEnabled);
+      if (!uploadedImage) {
+        await sendTelegramBotMessage(chatId, "No pude subir esa imagen. Intenta otra vez o escribe listo.");
+        return;
+      }
+
+      data.images = [...(data.images || []), uploadedImage.url];
+      await sendTelegramBotMessage(chatId, `Imagen agregada (${data.images.length}). Envía otra o escribe listo.`);
+      return;
+    }
+
+    if (value.toLowerCase() === "no") {
+      data.images = [];
+    } else if (value.toLowerCase() !== "listo") {
+      await sendTelegramBotMessage(chatId, "Envíame una foto, o escribe listo para guardar, o no para seguir sin imágenes.");
+      return;
+    }
 
     db.run(
       "INSERT INTO services (id, name, category, status, price, priceOptionsJson, description, imagesJson) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -358,6 +374,45 @@ async function sendTelegramBotMessage(chatId, text) {
       text
     })
   });
+}
+
+async function storeTelegramMedia(message, cloudinaryEnabled) {
+  if (!TELEGRAM_BOT_TOKEN) {
+    return null;
+  }
+
+  const photo = Array.isArray(message.photo) && message.photo.length
+    ? message.photo[message.photo.length - 1]
+    : null;
+  const document = message.document || null;
+  const fileId = photo?.file_id || document?.file_id;
+
+  if (!fileId) {
+    return null;
+  }
+
+  const fileInfoResponse = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getFile?file_id=${encodeURIComponent(fileId)}`);
+  const fileInfo = await fileInfoResponse.json();
+  if (!fileInfo.ok || !fileInfo.result?.file_path) {
+    return null;
+  }
+
+  const filePath = fileInfo.result.file_path;
+  const downloadResponse = await fetch(`https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${filePath}`);
+  if (!downloadResponse.ok) {
+    return null;
+  }
+
+  const arrayBuffer = await downloadResponse.arrayBuffer();
+  const originalName = document?.file_name || path.basename(filePath) || `telegram-${Date.now()}.jpg`;
+
+  return storeUploadedFile(
+    {
+      originalname: originalName,
+      buffer: Buffer.from(arrayBuffer)
+    },
+    cloudinaryEnabled
+  );
 }
 
 async function main() {
@@ -658,7 +713,8 @@ async function main() {
 
   startTelegramAdminBot({
     db,
-    persistDatabase
+    persistDatabase,
+    cloudinaryEnabled
   });
 
   function requireAdmin(request, response, next) {

@@ -59,6 +59,7 @@ Si quieres notificacion a Telegram agrega:
 - `TELEGRAM_ADMIN_CHAT_IDS`
 
 El bot admin usa la misma base de datos de la web, así que lo que cambies ahí también aparece en la página.
+Cuando uses `/agregar`, en el paso de imágenes puedes enviar la foto directamente por Telegram y luego escribir `listo`.
 
 Comandos base del bot:
 
