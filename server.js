@@ -127,6 +127,11 @@ function startTelegramAdminBot({ db, persistDatabase, cloudinaryEnabled }) {
 }
 
 async function handleTelegramAdminUpdate(update, context) {
+  if (update.callback_query) {
+    await handleTelegramAdminCallback(update.callback_query, context);
+    return;
+  }
+
   const message = update.message;
   if (!message || !message.chat?.id) {
     return;
@@ -149,6 +154,26 @@ async function handleTelegramAdminUpdate(update, context) {
 
   if (session?.mode === "add_service") {
     await continueAddServiceWizard(chatId, message, session, context);
+    return;
+  }
+
+  if (session?.mode === "add_coupon") {
+    await continueAddCouponWizard(chatId, message, session, context);
+    return;
+  }
+
+  if (session?.mode === "edit_service_price") {
+    await continueEditServicePrice(chatId, message, session, context);
+    return;
+  }
+
+  if (session?.mode === "edit_service_description") {
+    await continueEditServiceDescription(chatId, message, session, context);
+    return;
+  }
+
+  if (session?.mode === "edit_service_images") {
+    await continueEditServiceImages(chatId, message, session, context);
   }
 }
 
@@ -159,33 +184,20 @@ async function handleTelegramAdminCommand(chatId, text, { db, persistDatabase })
   if (command === "/start" || command === "/menu" || command === "/ayuda") {
     await sendTelegramBotMessage(
       chatId,
-      [
-        "Bot admin de PERUDOXER",
-        "",
-        "/productos - listar productos",
-        "/agregar - agregar producto paso a paso",
-        "/precio ID nuevo_precio - cambiar precio",
-        "/estado ID Disponible|Nuevo|Oferta|Agotado - cambiar estado",
-        "/descripcion ID texto - cambiar descripcion",
-        "/eliminar ID - eliminar producto"
-      ].join("\n")
+      "Bot admin de PERUDOXER",
+      {
+        inline_keyboard: [
+          [{ text: "Productos", callback_data: "menu_products" }, { text: "Agregar producto", callback_data: "menu_add_service" }],
+          [{ text: "Cupones", callback_data: "menu_coupons" }, { text: "Pedidos", callback_data: "menu_orders" }],
+          [{ text: "Resumen", callback_data: "menu_summary" }]
+        ]
+      }
     );
     return;
   }
 
   if (command === "/productos") {
-    const store = readStore(db);
-    if (!store.services.length) {
-      await sendTelegramBotMessage(chatId, "No hay productos cargados.");
-      return;
-    }
-
-    const lines = store.services.slice(0, 25).map((service) => {
-      const shortId = service.id.slice(0, 8);
-      const price = service.priceOptions?.[0] || service.price;
-      return `${shortId} | ${service.name} | ${price} | ${service.status}`;
-    });
-    await sendTelegramBotMessage(chatId, ["Productos:", ...lines].join("\n"));
+    await sendTelegramProductsMenu(chatId, db);
     return;
   }
 
@@ -196,6 +208,21 @@ async function handleTelegramAdminCommand(chatId, text, { db, persistDatabase })
       data: {}
     });
     await sendTelegramBotMessage(chatId, "Vamos a agregar un producto.\n\n1. Envíame el nombre del servicio.");
+    return;
+  }
+
+  if (command === "/cupones") {
+    await sendTelegramCouponsMenu(chatId, db);
+    return;
+  }
+
+  if (command === "/pedidos") {
+    await sendTelegramOrders(chatId, db);
+    return;
+  }
+
+  if (command === "/resumen") {
+    await sendTelegramSummary(chatId, db);
     return;
   }
 
@@ -351,6 +378,125 @@ async function continueAddServiceWizard(chatId, message, session, { db, persistD
   }
 }
 
+async function continueAddCouponWizard(chatId, message, session, { db, persistDatabase }) {
+  const value = String(message.text || "").trim();
+  const data = session.data;
+
+  if (session.step === "code") {
+    data.code = value.toUpperCase();
+    session.step = "type";
+    await sendTelegramBotMessage(chatId, "2. Tipo de cupón:", {
+      inline_keyboard: [[
+        { text: "Porcentaje", callback_data: "coupon_type:percent" },
+        { text: "Monto fijo", callback_data: "coupon_type:fixed" }
+      ]]
+    });
+    return;
+  }
+
+  if (session.step === "value") {
+    const numericValue = Number(value.replace(",", "."));
+    if (!Number.isFinite(numericValue) || numericValue <= 0) {
+      await sendTelegramBotMessage(chatId, "Envíame un valor válido para el cupón.");
+      return;
+    }
+
+    data.value = numericValue;
+    session.step = "active";
+    await sendTelegramBotMessage(chatId, "3. ¿El cupón estará activo?", {
+      inline_keyboard: [[
+        { text: "Sí", callback_data: "coupon_active:1" },
+        { text: "No", callback_data: "coupon_active:0" }
+      ]]
+    });
+    return;
+  }
+
+  if (session.step === "done") {
+    db.run(
+      "INSERT INTO coupons (id, code, type, value, active) VALUES (?, ?, ?, ?, ?)",
+      [crypto.randomUUID(), data.code, data.type || "percent", data.value || 0, data.active ? 1 : 0]
+    );
+    persistDatabase(db);
+    telegramBotSessions.delete(chatId);
+    await sendTelegramBotMessage(chatId, `Cupón creado: ${data.code}`);
+  }
+}
+
+async function continueEditServicePrice(chatId, message, session, { db, persistDatabase }) {
+  const nextPrice = String(message.text || "").trim();
+  if (!nextPrice) {
+    await sendTelegramBotMessage(chatId, "Envíame un precio válido.");
+    return;
+  }
+
+  db.run("UPDATE services SET price = ? WHERE id = ?", [nextPrice, session.serviceId]);
+  persistDatabase(db);
+  telegramBotSessions.delete(chatId);
+  await sendTelegramBotMessage(chatId, "Precio actualizado.");
+}
+
+async function continueEditServiceDescription(chatId, message, session, { db, persistDatabase }) {
+  const nextDescription = String(message.text || "").trim();
+  if (!nextDescription) {
+    await sendTelegramBotMessage(chatId, "Envíame una descripción válida.");
+    return;
+  }
+
+  db.run("UPDATE services SET description = ? WHERE id = ?", [nextDescription, session.serviceId]);
+  persistDatabase(db);
+  telegramBotSessions.delete(chatId);
+  await sendTelegramBotMessage(chatId, "Descripción actualizada.");
+}
+
+async function continueEditServiceImages(chatId, message, session, { db, persistDatabase, cloudinaryEnabled }) {
+  const value = String(message.text || "").trim().toLowerCase();
+  const store = readStore(db);
+  const service = store.services.find((item) => item.id === session.serviceId);
+
+  if (!service) {
+    telegramBotSessions.delete(chatId);
+    await sendTelegramBotMessage(chatId, "No encontré ese producto.");
+    return;
+  }
+
+  if (message.photo?.length || message.document) {
+    const uploadedImage = await storeTelegramMedia(message, cloudinaryEnabled);
+    if (!uploadedImage) {
+      await sendTelegramBotMessage(chatId, "No pude subir esa imagen. Intenta otra vez o escribe listo.");
+      return;
+    }
+
+    const currentImages = Array.isArray(session.images) ? session.images : [...(service.images || [])];
+    if (session.imageMode === "replace" && !session.hasReplacedOnce) {
+      session.images = [uploadedImage.url];
+      session.hasReplacedOnce = true;
+    } else {
+      session.images = [...currentImages, uploadedImage.url];
+    }
+
+    await sendTelegramBotMessage(chatId, `Imagen agregada (${session.images.length}). Envía otra o escribe listo.`);
+    return;
+  }
+
+  if (value === "cancelar") {
+    telegramBotSessions.delete(chatId);
+    await sendTelegramBotMessage(chatId, "Edición de fotos cancelada.");
+    return;
+  }
+
+  if (value !== "listo") {
+    await sendTelegramBotMessage(chatId, "Envíame una foto, escribe listo para guardar o cancelar para salir.");
+    return;
+  }
+
+  const finalImages = Array.isArray(session.images) ? session.images : [...(service.images || [])];
+  db.run("UPDATE services SET imagesJson = ? WHERE id = ?", [JSON.stringify(finalImages), service.id]);
+  persistDatabase(db);
+  telegramBotSessions.delete(chatId);
+  await sendTelegramBotMessage(chatId, `Fotos actualizadas para ${service.name}.`);
+}
+
 function findServiceByTelegramId(db, rawId) {
   const value = String(rawId || "").trim();
   if (!value) {
@@ -361,7 +507,325 @@ function findServiceByTelegramId(db, rawId) {
   return store.services.find((service) => service.id === value || service.id.startsWith(value));
 }
 
-async function sendTelegramBotMessage(chatId, text) {
+async function handleTelegramAdminCallback(callbackQuery, { db, persistDatabase }) {
+  const chatId = String(callbackQuery.message?.chat?.id || callbackQuery.from?.id || "");
+  const callbackId = callbackQuery.id;
+  const data = String(callbackQuery.data || "");
+
+  if (!chatId || !TELEGRAM_ADMIN_CHAT_IDS.includes(chatId)) {
+    await answerTelegramCallback(callbackId, "No autorizado");
+    return;
+  }
+
+  if (data === "menu_products") {
+    await answerTelegramCallback(callbackId, "Productos");
+    await sendTelegramProductsMenu(chatId, db);
+    return;
+  }
+
+  if (data === "menu_add_service") {
+    telegramBotSessions.set(chatId, { mode: "add_service", step: "name", data: {} });
+    await answerTelegramCallback(callbackId, "Agregar producto");
+    await sendTelegramBotMessage(chatId, "Vamos a agregar un producto.\n\n1. Envíame el nombre del servicio.");
+    return;
+  }
+
+  if (data === "menu_coupons") {
+    await answerTelegramCallback(callbackId, "Cupones");
+    await sendTelegramCouponsMenu(chatId, db);
+    return;
+  }
+
+  if (data === "menu_orders") {
+    await answerTelegramCallback(callbackId, "Pedidos");
+    await sendTelegramOrders(chatId, db);
+    return;
+  }
+
+  if (data === "menu_summary") {
+    await answerTelegramCallback(callbackId, "Resumen");
+    await sendTelegramSummary(chatId, db);
+    return;
+  }
+
+  if (data === "menu_back") {
+    await answerTelegramCallback(callbackId, "Menú");
+    await handleTelegramAdminCommand(chatId, "/start", { db, persistDatabase });
+    return;
+  }
+
+  if (data === "noop") {
+    await answerTelegramCallback(callbackId, "OK");
+    return;
+  }
+
+  if (data === "coupon_add") {
+    telegramBotSessions.set(chatId, { mode: "add_coupon", step: "code", data: {} });
+    await answerTelegramCallback(callbackId, "Nuevo cupón");
+    await sendTelegramBotMessage(chatId, "Vamos a crear un cupón.\n\n1. Envíame el código. Ejemplo: BIENVENIDA10");
+    return;
+  }
+
+  if (data.startsWith("coupon_type:")) {
+    const session = telegramBotSessions.get(chatId);
+    if (session?.mode === "add_coupon") {
+      session.data.type = data.split(":")[1] || "percent";
+      session.step = "value";
+      await answerTelegramCallback(callbackId, "Tipo guardado");
+      await sendTelegramBotMessage(chatId, "Ahora envíame el valor. Ejemplo: 10");
+      return;
+    }
+  }
+
+  if (data.startsWith("coupon_active:")) {
+    const session = telegramBotSessions.get(chatId);
+    if (session?.mode === "add_coupon") {
+      session.data.active = data.endsWith(":1");
+      session.step = "done";
+      await answerTelegramCallback(callbackId, "Estado guardado");
+      await continueAddCouponWizard(chatId, { text: "ok" }, session, { db, persistDatabase });
+      return;
+    }
+  }
+
+  if (data.startsWith("coupon_delete:")) {
+    const couponId = data.split(":")[1];
+    db.run("DELETE FROM coupons WHERE id = ?", [couponId]);
+    persistDatabase(db);
+    await answerTelegramCallback(callbackId, "Cupón eliminado");
+    await sendTelegramCouponsMenu(chatId, db);
+    return;
+  }
+
+  if (data.startsWith("coupon_toggle:")) {
+    const couponId = data.split(":")[1];
+    const store = readStore(db);
+    const coupon = store.coupons.find((item) => item.id === couponId);
+    if (coupon) {
+      db.run("UPDATE coupons SET active = ? WHERE id = ?", [coupon.active ? 0 : 1, coupon.id]);
+      persistDatabase(db);
+    }
+    await answerTelegramCallback(callbackId, "Cupón actualizado");
+    await sendTelegramCouponsMenu(chatId, db);
+    return;
+  }
+
+  if (data.startsWith("product_view:")) {
+    const service = findServiceByTelegramId(db, data.split(":")[1]);
+    if (!service) {
+      await answerTelegramCallback(callbackId, "No encontrado");
+      return;
+    }
+
+    await answerTelegramCallback(callbackId, "Producto");
+    await sendTelegramProductCard(chatId, service);
+    return;
+  }
+
+  if (data.startsWith("product_price:")) {
+    const serviceId = data.split(":")[1];
+    telegramBotSessions.set(chatId, { mode: "edit_service_price", serviceId });
+    await answerTelegramCallback(callbackId, "Cambiar precio");
+    await sendTelegramBotMessage(chatId, "Envíame el nuevo precio. Ejemplo: S/ 30");
+    return;
+  }
+
+  if (data.startsWith("product_desc:")) {
+    const serviceId = data.split(":")[1];
+    telegramBotSessions.set(chatId, { mode: "edit_service_description", serviceId });
+    await answerTelegramCallback(callbackId, "Cambiar descripción");
+    await sendTelegramBotMessage(chatId, "Envíame la nueva descripción.");
+    return;
+  }
+
+  if (data.startsWith("product_images:")) {
+    const serviceId = data.split(":")[1];
+    await answerTelegramCallback(callbackId, "Fotos");
+    await sendTelegramBotMessage(chatId, "¿Qué quieres hacer con las fotos?", {
+      inline_keyboard: [
+        [
+          { text: "Agregar fotos", callback_data: `product_images_add:${serviceId}` },
+          { text: "Reemplazar todas", callback_data: `product_images_replace:${serviceId}` }
+        ],
+        [
+          { text: "Volver", callback_data: `product_view:${serviceId}` }
+        ]
+      ]
+    });
+    return;
+  }
+
+  if (data.startsWith("product_images_add:")) {
+    const serviceId = data.split(":")[1];
+    telegramBotSessions.set(chatId, {
+      mode: "edit_service_images",
+      serviceId,
+      imageMode: "add",
+      images: null
+    });
+    await answerTelegramCallback(callbackId, "Agregar fotos");
+    await sendTelegramBotMessage(chatId, "Envíame una o varias fotos. Cuando termines, escribe listo.");
+    return;
+  }
+
+  if (data.startsWith("product_images_replace:")) {
+    const serviceId = data.split(":")[1];
+    telegramBotSessions.set(chatId, {
+      mode: "edit_service_images",
+      serviceId,
+      imageMode: "replace",
+      images: [],
+      hasReplacedOnce: false
+    });
+    await answerTelegramCallback(callbackId, "Reemplazar fotos");
+    await sendTelegramBotMessage(chatId, "Envíame las nuevas fotos. La primera reemplazará todas las anteriores. Cuando termines, escribe listo.");
+    return;
+  }
+
+  if (data.startsWith("product_delete:")) {
+    const service = findServiceByTelegramId(db, data.split(":")[1]);
+    if (service) {
+      db.run("DELETE FROM services WHERE id = ?", [service.id]);
+      persistDatabase(db);
+    }
+    await answerTelegramCallback(callbackId, "Producto eliminado");
+    await sendTelegramProductsMenu(chatId, db);
+    return;
+  }
+
+  if (data.startsWith("product_status:")) {
+    const serviceId = data.split(":")[1];
+    await answerTelegramCallback(callbackId, "Elegir estado");
+    await sendTelegramBotMessage(chatId, "Elige el nuevo estado:", {
+      inline_keyboard: [
+        [
+          { text: "Disponible", callback_data: `status_set:${serviceId}:Disponible` },
+          { text: "Nuevo", callback_data: `status_set:${serviceId}:Nuevo` }
+        ],
+        [
+          { text: "Oferta", callback_data: `status_set:${serviceId}:Oferta` },
+          { text: "Agotado", callback_data: `status_set:${serviceId}:Agotado` }
+        ]
+      ]
+    });
+    return;
+  }
+
+  if (data.startsWith("status_set:")) {
+    const [, serviceId, status] = data.split(":");
+    db.run("UPDATE services SET status = ? WHERE id = ?", [status, serviceId]);
+    persistDatabase(db);
+    await answerTelegramCallback(callbackId, "Estado actualizado");
+    await sendTelegramProductsMenu(chatId, db);
+    return;
+  }
+
+  await answerTelegramCallback(callbackId, "Acción no disponible");
+}
+
+async function sendTelegramProductsMenu(chatId, db) {
+  const store = readStore(db);
+  if (!store.services.length) {
+    await sendTelegramBotMessage(chatId, "No hay productos cargados.");
+    return;
+  }
+
+  await sendTelegramBotMessage(chatId, "Productos disponibles:", {
+    inline_keyboard: [
+      ...store.services.slice(0, 12).map((service) => ([
+        { text: `${service.name.slice(0, 24)} | ${service.status}`, callback_data: `product_view:${service.id}` }
+      ])),
+      [{ text: "Volver al menú", callback_data: "menu_back" }]
+    ]
+  });
+}
+
+async function sendTelegramProductCard(chatId, service) {
+  const price = service.priceOptions?.[0] || service.price;
+  await sendTelegramBotMessage(
+    chatId,
+    [
+      `Producto: ${service.name}`,
+      `ID: ${service.id.slice(0, 8)}`,
+      `Precio: ${price}`,
+      `Estado: ${service.status}`,
+      `Categoria: ${service.category}`,
+      service.description ? `Descripcion: ${service.description}` : ""
+    ].filter(Boolean).join("\n"),
+    {
+      inline_keyboard: [
+        [
+          { text: "Cambiar precio", callback_data: `product_price:${service.id}` },
+          { text: "Cambiar estado", callback_data: `product_status:${service.id}` }
+        ],
+        [
+          { text: "Cambiar fotos", callback_data: `product_images:${service.id}` },
+          { text: "Cambiar descripción", callback_data: `product_desc:${service.id}` }
+        ],
+        [
+          { text: "Eliminar", callback_data: `product_delete:${service.id}` }
+        ],
+        [
+          { text: "Volver a productos", callback_data: "menu_products" }
+        ]
+      ]
+    }
+  );
+}
+
+async function sendTelegramCouponsMenu(chatId, db) {
+  const store = readStore(db);
+  const rows = store.coupons.slice(0, 10).flatMap((coupon) => ([
+    [{ text: `${coupon.code} | ${coupon.active ? "Activo" : "Inactivo"}`, callback_data: "noop" }],
+    [
+      { text: coupon.active ? "Desactivar" : "Activar", callback_data: `coupon_toggle:${coupon.id}` },
+      { text: "Eliminar", callback_data: `coupon_delete:${coupon.id}` }
+    ]
+  ]));
+
+  rows.unshift([{ text: "Crear cupón", callback_data: "coupon_add" }]);
+  rows.push([{ text: "Volver al menú", callback_data: "menu_back" }]);
+  await sendTelegramBotMessage(chatId, "Panel de cupones:", { inline_keyboard: rows });
+}
+
+async function sendTelegramOrders(chatId, db) {
+  const store = readStore(db);
+  if (!store.orders.length) {
+    await sendTelegramBotMessage(chatId, "No hay pedidos registrados.");
+    return;
+  }
+
+  const lines = store.orders.slice(0, 10).map((order) => [
+    `Servicio: ${order.serviceName}`,
+    `Cliente: ${order.customerName}`,
+    `Precio: ${order.finalPrice || order.servicePrice}`,
+    order.couponCode ? `Cupón: ${order.couponCode}` : "",
+    order.paymentProofUrl ? `Comprobante: ${order.paymentProofUrl}` : "",
+    `Fecha: ${order.createdAt}`
+  ].filter(Boolean).join("\n"));
+
+  await sendTelegramBotMessage(chatId, lines.join("\n\n"), {
+    inline_keyboard: [[{ text: "Volver al menú", callback_data: "menu_back" }]]
+  });
+}
+
+async function sendTelegramSummary(chatId, db) {
+  const store = readStore(db);
+  await sendTelegramBotMessage(
+    chatId,
+    [
+      `Servicios: ${store.services.length}`,
+      `Pedidos: ${store.orders.length}`,
+      `Cupones activos: ${store.coupons.filter((coupon) => coupon.active).length}`,
+      `Reseñas: ${store.testimonials.length}`
+    ].join("\n"),
+    {
+      inline_keyboard: [[{ text: "Volver al menú", callback_data: "menu_back" }]]
+    }
+  );
+}
+
+async function sendTelegramBotMessage(chatId, text, replyMarkup) {
   if (!TELEGRAM_BOT_TOKEN) {
     return;
   }
@@ -371,6 +835,22 @@ async function sendTelegramBotMessage(chatId, text) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       chat_id: chatId,
+      text,
+      reply_markup: replyMarkup
+    })
+  });
+}
+
+async function answerTelegramCallback(callbackId, text) {
+  if (!TELEGRAM_BOT_TOKEN || !callbackId) {
+    return;
+  }
+
+  await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      callback_query_id: callbackId,
       text
     })
   });

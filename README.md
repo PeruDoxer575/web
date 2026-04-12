@@ -65,10 +65,27 @@ Comandos base del bot:
 
 - `/productos`
 - `/agregar`
+- `/cupones`
+- `/pedidos`
+- `/resumen`
 - `/precio ID nuevo_precio`
 - `/estado ID Disponible|Nuevo|Oferta|Agotado`
 - `/descripcion ID texto`
 - `/eliminar ID`
+
+Además del texto, ahora el bot tiene menú con botones para:
+
+- productos
+- crear cupones
+- ver pedidos
+- editar precio, estado, descripción y fotos
+- volver al menú con botones
+
+En edición de fotos:
+
+- puedes agregar fotos nuevas
+- o reemplazar todas las fotos de un producto
+- envías la imagen directo por Telegram y luego escribes `listo`
 
 Para pruebas locales, si quieres, tambien puedes usar Gmail con App Password en `SMTP_PASS`.
 
