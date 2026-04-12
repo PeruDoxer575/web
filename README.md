@@ -68,6 +68,8 @@ Comandos base del bot:
 - `/cupones`
 - `/pedidos`
 - `/resumen`
+- `/buscar nombre`
+- `/ajustes`
 - `/precio ID nuevo_precio`
 - `/estado ID Disponible|Nuevo|Oferta|Agotado`
 - `/descripcion ID texto`
@@ -79,7 +81,15 @@ Además del texto, ahora el bot tiene menú con botones para:
 - crear cupones
 - ver pedidos
 - editar precio, estado, descripción y fotos
+- editar categoría y precios adicionales
 - volver al menú con botones
+- buscar productos por nombre
+- confirmar borrado antes de eliminar
+- abrir comprobantes desde botones en pedidos
+- marcar pedidos como pendiente o atendido
+- cambiar WhatsApp, correo, titular Plin y lema desde Telegram
+- editar valor y tipo de cupones desde botones
+- recibir alerta de pedido con botón `Atender ahora`
 
 En edición de fotos:
 

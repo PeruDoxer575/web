@@ -450,6 +450,15 @@ h2 { font-size: clamp(2rem, 4vw, 3rem); }
   background: #fff;
   margin-top: 12px;
 }
+.payment-steps {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.payment-steps li + li {
+  margin-top: 8px;
+}
 
 .steps, .payment-grid, .testimonials-grid, .why-grid, .faq-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-top: 28px; }
 

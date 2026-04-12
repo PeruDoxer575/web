@@ -125,12 +125,18 @@
         </article>
         <article class="payment-card">
           <h3>Método de pago</h3>
-          <p id="payment-method-copy">Plin por QR. El cliente puede pagar desde cualquier banco compatible con Plin.</p>
-          <button class="ghost-button" type="button" data-copy-payment="true">Copiar datos de pago</button>
+          <p id="payment-method-copy">Descarga el QR y escanéalo desde Yape, Plin o tu banco compatible.</p>
+          <a id="payment-qr-download" class="ghost-button hidden" download="perudoxer-qr.jpg">Descargar QR</a>
         </article>
         <article class="payment-card">
-          <h3>Confirmación</h3>
-          <p>Después de pagar por Plin, el cliente envía su comprobante directamente por WhatsApp para confirmar el pedido.</p>
+          <h3>Cómo pagar</h3>
+          <ol id="payment-steps" class="payment-steps">
+            <li>Guardar foto en galería</li>
+            <li>Vas a Yape o Plin o a tu banco</li>
+            <li>Das en escanear foto / escanear de galería</li>
+            <li>Seleccionas la foto y yapear</li>
+            <li>Mandar captura del pago para confirmar</li>
+          </ol>
         </article>
         <article id="payment-qr-card" class="payment-card hidden">
           <h3>QR de Plin</h3>
@@ -261,10 +267,10 @@
       <div id="order-service-gallery" class="order-gallery"></div>
       <div class="order-payment-box">
         <strong>Pago por Plin</strong>
-        <p id="order-payment-copy">Realiza el pago por Plin y luego envía tu comprobante por WhatsApp para confirmar.</p>
+        <p id="order-payment-copy">Descarga el QR, págalo desde Yape, Plin o tu banco y luego manda tu captura para confirmar.</p>
         <p id="order-payment-holder" class="hidden"></p>
         <img id="order-payment-qr" class="payment-qr-image hidden" alt="QR de pago Plin" loading="lazy">
-        <button class="ghost-button" type="button" data-copy-payment="true">Copiar datos de pago</button>
+        <a id="order-payment-qr-download" class="ghost-button hidden" download="perudoxer-qr.jpg">Descargar QR</a>
       </div>
 
       <form id="order-form" class="form">

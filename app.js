@@ -39,6 +39,7 @@ const paymentMethodCopy = document.querySelector("#payment-method-copy");
 const paymentQrCard = document.querySelector("#payment-qr-card");
 const paymentQrName = document.querySelector("#payment-qr-name");
 const paymentQrImage = document.querySelector("#payment-qr-image");
+const paymentQrDownload = document.querySelector("#payment-qr-download");
 const paymentQrPreview = document.querySelector("#payment-qr-preview");
 const faqPaymentHolder = document.querySelector("#faq-payment-holder");
 const orderModal = document.querySelector("#order-modal");
@@ -68,6 +69,7 @@ const orderPaymentProof = document.querySelector("#order-payment-proof");
 const orderPaymentCopy = document.querySelector("#order-payment-copy");
 const orderPaymentHolder = document.querySelector("#order-payment-holder");
 const orderPaymentQr = document.querySelector("#order-payment-qr");
+const orderPaymentQrDownload = document.querySelector("#order-payment-qr-download");
 const openAdminButton = document.querySelector("#open-admin");
 const openAdminFooterButton = document.querySelector("#open-admin-footer");
 const cancelEditButton = document.querySelector("#cancel-edit");
@@ -233,23 +235,26 @@ function renderPaymentInfo() {
   const currencyLabel = state.storeCurrency === "$" ? "dólares" : state.storeCurrency === "€" ? "euros" : "soles";
 
   paymentCopy.textContent = holder
-    ? `El pago se realiza por Plin con QR a nombre de ${holder}, en ${currencyLabel}, y puede enviarse desde cualquier banco del Perú que permita Plin.`
-    : `El pago se realiza por Plin con QR en ${currencyLabel} y puede enviarse desde cualquier banco del Perú que permita Plin.`;
+    ? `El pago se realiza con QR a nombre de ${holder}, en ${currencyLabel}, y puedes escanear la foto desde Yape, Plin o un banco compatible.`
+    : `El pago se realiza con QR en ${currencyLabel} y puedes escanear la foto desde Yape, Plin o un banco compatible.`;
 
   paymentMethodCopy.textContent = holder
-    ? `Plin por QR a nombre de ${holder}. El cliente puede pagar desde cualquier banco compatible con Plin.`
-    : "Plin por QR. El cliente puede pagar desde cualquier banco compatible con Plin.";
+    ? `Descarga el QR a nombre de ${holder} y págalo desde Yape, Plin o tu banco compatible.`
+    : "Descarga el QR y págalo desde Yape, Plin o tu banco compatible.";
   faqPaymentHolder.textContent = holder
     ? `El QR de pago está a nombre de ${holder}.`
     : "El QR de pago se mostrará con el titular configurado en la tienda.";
 
   paymentQrCard.classList.toggle("hidden", !qrUrl);
   paymentQrName.textContent = holder ? `Titular: ${holder}` : "";
+  paymentQrDownload.classList.toggle("hidden", !qrUrl);
 
   if (qrUrl) {
     paymentQrImage.src = qrUrl;
+    paymentQrDownload.href = qrUrl;
   } else {
     paymentQrImage.removeAttribute("src");
+    paymentQrDownload.removeAttribute("href");
   }
 }
 
@@ -615,7 +620,6 @@ function handleDocumentClick(event) {
   const deleteCouponId = event.target.getAttribute("data-delete-coupon-id");
   const serviceThumb = event.target.closest("[data-service-thumb='true']");
   const categoryFilter = event.target.closest("[data-service-category]");
-  const copyPaymentButton = event.target.closest("[data-copy-payment='true']");
 
   if (event.target.hasAttribute("data-close-modal")) {
     toggleModal(orderModal, false);
@@ -634,11 +638,6 @@ function handleDocumentClick(event) {
     activeServiceCategory = categoryFilter.getAttribute("data-service-category") || "Todas";
     renderServiceFilters();
     renderPublicServices();
-    return;
-  }
-
-  if (copyPaymentButton) {
-    copyPaymentData();
     return;
   }
 
@@ -668,20 +667,6 @@ function handleDocumentClick(event) {
 
   if (deleteCouponId) {
     deleteCoupon(deleteCouponId);
-  }
-}
-
-async function copyPaymentData() {
-  const holder = (state.paymentHolder || "").trim();
-  const paymentText = holder
-    ? `Pago por Plin a nombre de ${holder}. Luego envia tu comprobante por WhatsApp para confirmar el pedido.`
-    : "Pago por Plin. Luego envia tu comprobante por WhatsApp para confirmar el pedido.";
-
-  try {
-    await navigator.clipboard.writeText(paymentText);
-    adminStatus.textContent = "Datos de pago copiados.";
-  } catch (error) {
-    adminStatus.textContent = "No se pudieron copiar los datos de pago.";
   }
 }
 
@@ -717,15 +702,18 @@ function openOrderModal(orderId) {
     .map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`)
     .join("");
   orderPaymentCopy.textContent = state.paymentHolder
-    ? `Paga por Plin a nombre de ${state.paymentHolder} y luego envía tu comprobante por WhatsApp para confirmar este pedido.`
-    : "Realiza el pago por Plin y luego envía tu comprobante por WhatsApp para confirmar este pedido.";
+    ? `Descarga el QR a nombre de ${state.paymentHolder}, págalo desde Yape, Plin o tu banco y luego manda tu captura para confirmar este pedido.`
+    : "Descarga el QR, realiza el pago y luego manda tu captura para confirmar este pedido.";
   orderPaymentHolder.textContent = state.paymentHolder ? `Titular: ${state.paymentHolder}` : "";
   orderPaymentHolder.classList.toggle("hidden", !state.paymentHolder);
   orderPaymentQr.classList.toggle("hidden", !state.paymentQrUrl);
+  orderPaymentQrDownload.classList.toggle("hidden", !state.paymentQrUrl);
   if (state.paymentQrUrl) {
     orderPaymentQr.src = state.paymentQrUrl;
+    orderPaymentQrDownload.href = state.paymentQrUrl;
   } else {
     orderPaymentQr.removeAttribute("src");
+    orderPaymentQrDownload.removeAttribute("href");
   }
   orderForm.reset();
   orderCouponCode.value = "";
