@@ -41,6 +41,7 @@ Desde el panel puedes:
 - agregar, editar y eliminar reseñas
 - crear cupones simples por porcentaje o monto fijo
 - revisar el historial de pedidos y comprobantes
+- recibir apoyo de un bot admin privado en Telegram para agregar o editar productos
 
 ## Correo
 
@@ -55,6 +56,18 @@ Si quieres notificacion a Telegram agrega:
 
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
+- `TELEGRAM_ADMIN_CHAT_IDS`
+
+El bot admin usa la misma base de datos de la web, así que lo que cambies ahí también aparece en la página.
+
+Comandos base del bot:
+
+- `/productos`
+- `/agregar`
+- `/precio ID nuevo_precio`
+- `/estado ID Disponible|Nuevo|Oferta|Agotado`
+- `/descripcion ID texto`
+- `/eliminar ID`
 
 Para pruebas locales, si quieres, tambien puedes usar Gmail con App Password en `SMTP_PASS`.
 
@@ -74,6 +87,7 @@ Pasos recomendados:
    `RESEND_FROM`
    `TELEGRAM_BOT_TOKEN`
    `TELEGRAM_CHAT_ID`
+   `TELEGRAM_ADMIN_CHAT_IDS`
    `SMTP_HOST`
    `SMTP_PORT`
    `SMTP_USER`
