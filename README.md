@@ -92,6 +92,7 @@ Además del texto, ahora el bot tiene menú con botones para:
 - recibir alerta de pedido con botón `Atender ahora`
 - usar respuestas rápidas desde pedidos:
   `Pago recibido`, `Te escribo en breve`, `Envíame captura`
+- marcar pedidos como `pagado`, `en proceso` y `entregado`
 
 En edición de fotos:
 
