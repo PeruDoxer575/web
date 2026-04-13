@@ -49,6 +49,9 @@ const defaultStore = {
   storeLanguage: "es",
   paymentHolder: "Kimberly Cunyas",
   paymentQrUrl: "",
+  quickReplyPaid: "Hola {cliente}, pago recibido para {servicio}. En un momento seguimos con tu atención por {negocio}.",
+  quickReplySoon: "Hola {cliente}, ya vi tu solicitud de {servicio}. Te escribo en breve para continuar con la coordinación.",
+  quickReplyProof: "Hola {cliente}, para confirmar {servicio} envíame por favor tu captura o comprobante de pago.",
   services: [
     {
       id: crypto.randomUUID(),
@@ -95,6 +98,11 @@ const upload = multer({
 });
 
 const telegramBotSessions = new Map();
+const DEFAULT_QUICK_REPLIES = {
+  quickReplyPaid: "Hola {cliente}, pago recibido para {servicio}. En un momento seguimos con tu atención por {negocio}.",
+  quickReplySoon: "Hola {cliente}, ya vi tu solicitud de {servicio}. Te escribo en breve para continuar con la coordinación.",
+  quickReplyProof: "Hola {cliente}, para confirmar {servicio} envíame por favor tu captura o comprobante de pago."
+};
 
 function startTelegramAdminBot({ db, persistDatabase, cloudinaryEnabled }) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_IDS.length) {
@@ -199,6 +207,11 @@ async function handleTelegramAdminUpdate(update, context) {
 
   if (session?.mode === "edit_coupon_value") {
     await continueEditCouponValue(chatId, message, session, context);
+    return;
+  }
+
+  if (session?.mode === "edit_quick_reply") {
+    await continueEditQuickReply(chatId, message, session, context);
   }
 }
 
@@ -215,7 +228,8 @@ async function handleTelegramAdminCommand(chatId, text, { db, persistDatabase })
         inline_keyboard: [
           [{ text: "Productos", callback_data: "menu_products" }, { text: "Agregar producto", callback_data: "menu_add_service" }],
           [{ text: "Cupones", callback_data: "menu_coupons" }, { text: "Pedidos", callback_data: "menu_orders" }],
-          [{ text: "Resumen", callback_data: "menu_summary" }, { text: "Ajustes", callback_data: "menu_settings" }]
+          [{ text: "Resumen", callback_data: "menu_summary" }, { text: "Ajustes", callback_data: "menu_settings" }],
+          [{ text: "Favoritos", callback_data: "menu_favorites" }, { text: "Respuestas", callback_data: "menu_quick_replies" }]
         ]
       }
     );
@@ -605,6 +619,19 @@ async function continueEditCouponValue(chatId, message, session, { db, persistDa
   await sendTelegramBotMessage(chatId, "Valor del cupón actualizado.");
 }
 
+async function continueEditQuickReply(chatId, message, session, { db, persistDatabase }) {
+  const value = String(message.text || "").trim();
+  if (!value) {
+    await sendTelegramBotMessage(chatId, "Envíame un texto válido para la respuesta rápida.");
+    return;
+  }
+
+  writeSetting(db, session.settingKey, value);
+  persistDatabase(db);
+  telegramBotSessions.delete(chatId);
+  await sendTelegramBotMessage(chatId, "Respuesta rápida actualizada.");
+}
+
 function findServiceByTelegramId(db, rawId) {
   const value = String(rawId || "").trim();
   if (!value) {
@@ -656,9 +683,21 @@ async function handleTelegramAdminCallback(callbackQuery, { db, persistDatabase 
     return;
   }
 
+  if (data === "menu_favorites") {
+    await answerTelegramCallback(callbackId, "Favoritos");
+    await sendTelegramFavoritesMenu(chatId);
+    return;
+  }
+
   if (data === "menu_settings") {
     await answerTelegramCallback(callbackId, "Ajustes");
     await sendTelegramSettingsMenu(chatId, db);
+    return;
+  }
+
+  if (data === "menu_quick_replies") {
+    await answerTelegramCallback(callbackId, "Respuestas");
+    await sendTelegramQuickRepliesMenu(chatId, db);
     return;
   }
 
@@ -765,6 +804,14 @@ async function handleTelegramAdminCallback(callbackQuery, { db, persistDatabase 
     telegramBotSessions.set(chatId, { mode: "edit_setting", settingKey });
     await answerTelegramCallback(callbackId, "Editar ajuste");
     await sendTelegramBotMessage(chatId, "Envíame el nuevo valor.");
+    return;
+  }
+
+  if (data.startsWith("quick_reply_edit:")) {
+    const settingKey = data.split(":")[1];
+    telegramBotSessions.set(chatId, { mode: "edit_quick_reply", settingKey });
+    await answerTelegramCallback(callbackId, "Editar respuesta");
+    await sendTelegramBotMessage(chatId, "Envíame el nuevo texto. Puedes usar {cliente}, {servicio} y {negocio}.");
     return;
   }
 
@@ -1167,6 +1214,57 @@ async function sendTelegramSettingsMenu(chatId, db) {
   );
 }
 
+async function sendTelegramFavoritesMenu(chatId) {
+  await sendTelegramBotMessage(
+    chatId,
+    "Atajos favoritos listos para mover lo que más usas.",
+    {
+      inline_keyboard: [
+        [
+          { text: "Pedidos", callback_data: "menu_orders" },
+          { text: "Agregar producto", callback_data: "menu_add_service" }
+        ],
+        [
+          { text: "Buscar producto", callback_data: "menu_search" },
+          { text: "Cupones", callback_data: "menu_coupons" }
+        ],
+        [
+          { text: "Volver al menú", callback_data: "menu_back" }
+        ]
+      ]
+    }
+  );
+}
+
+async function sendTelegramQuickRepliesMenu(chatId, db) {
+  const store = readStore(db);
+  await sendTelegramBotMessage(
+    chatId,
+    [
+      "Respuestas rápidas personalizadas",
+      `Pago recibido: ${store.quickReplyPaid || DEFAULT_QUICK_REPLIES.quickReplyPaid}`,
+      `Te escribo en breve: ${store.quickReplySoon || DEFAULT_QUICK_REPLIES.quickReplySoon}`,
+      `Envíame captura: ${store.quickReplyProof || DEFAULT_QUICK_REPLIES.quickReplyProof}`
+    ].join("\n\n"),
+    {
+      inline_keyboard: [
+        [
+          { text: "Editar pago recibido", callback_data: "quick_reply_edit:quickReplyPaid" }
+        ],
+        [
+          { text: "Editar te escribo en breve", callback_data: "quick_reply_edit:quickReplySoon" }
+        ],
+        [
+          { text: "Editar envíame captura", callback_data: "quick_reply_edit:quickReplyProof" }
+        ],
+        [
+          { text: "Volver al menú", callback_data: "menu_back" }
+        ]
+      ]
+    }
+  );
+}
+
 async function sendTelegramBotMessage(chatId, text, replyMarkup) {
   if (!TELEGRAM_BOT_TOKEN) {
     return;
@@ -1177,7 +1275,9 @@ async function sendTelegramBotMessage(chatId, text, replyMarkup) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       chat_id: chatId,
-      text,
+      text: toMarkdownMessage(text),
+      parse_mode: "MarkdownV2",
+      disable_web_page_preview: true,
       reply_markup: replyMarkup
     })
   });
@@ -1201,17 +1301,19 @@ async function sendTelegramSticker(chatId, sticker) {
 function buildQuickReplyMessage(replyType, order, store) {
   const customerName = order.customerName || "cliente";
   const serviceName = order.serviceName || "tu pedido";
+  const businessName = store.storeName || "PERUDOXER";
+  const templates = {
+    paid: store.quickReplyPaid || DEFAULT_QUICK_REPLIES.quickReplyPaid,
+    soon: store.quickReplySoon || DEFAULT_QUICK_REPLIES.quickReplySoon,
+    proof: store.quickReplyProof || DEFAULT_QUICK_REPLIES.quickReplyProof
+  };
+  const template = templates[replyType];
 
-  if (replyType === "paid") {
-    return `Hola ${customerName}, pago recibido para ${serviceName}. En un momento seguimos con tu atención por ${store.storeName}.`;
-  }
-
-  if (replyType === "soon") {
-    return `Hola ${customerName}, ya vi tu solicitud de ${serviceName}. Te escribo en breve para continuar con la coordinación.`;
-  }
-
-  if (replyType === "proof") {
-    return `Hola ${customerName}, para confirmar ${serviceName} envíame por favor tu captura o comprobante de pago.`;
+  if (template) {
+    return template
+      .replaceAll("{cliente}", customerName)
+      .replaceAll("{servicio}", serviceName)
+      .replaceAll("{negocio}", businessName);
   }
 
   return "";
@@ -1231,6 +1333,22 @@ function humanizeOrderStatus(status) {
   }
 
   return "Pendiente";
+}
+
+function toMarkdownMessage(text) {
+  const lines = String(text || "").split("\n");
+  if (!lines.length) {
+    return "";
+  }
+
+  const [firstLine, ...rest] = lines;
+  const safeFirstLine = firstLine ? `*${escapeMarkdownV2(firstLine)}*` : "";
+  const safeRest = rest.map((line) => escapeMarkdownV2(line)).join("\n");
+  return [safeFirstLine, safeRest].filter(Boolean).join("\n");
+}
+
+function escapeMarkdownV2(value) {
+  return String(value || "").replace(/[_*[\]()~`>#+\-=|{}.!]/g, "\\$&");
 }
 
 async function answerTelegramCallback(callbackId, text) {
@@ -1718,6 +1836,9 @@ function resetStore(db) {
   writeSetting(db, "storeLanguage", defaultStore.storeLanguage);
   writeSetting(db, "paymentHolder", defaultStore.paymentHolder);
   writeSetting(db, "paymentQrUrl", defaultStore.paymentQrUrl);
+  writeSetting(db, "quickReplyPaid", defaultStore.quickReplyPaid);
+  writeSetting(db, "quickReplySoon", defaultStore.quickReplySoon);
+  writeSetting(db, "quickReplyProof", defaultStore.quickReplyProof);
 
   for (const service of defaultStore.services) {
     db.run(
@@ -1779,6 +1900,9 @@ function readStore(db) {
     storeLanguage: settings.storeLanguage || defaultStore.storeLanguage,
     paymentHolder: settings.paymentHolder || defaultStore.paymentHolder,
     paymentQrUrl: settings.paymentQrUrl || defaultStore.paymentQrUrl,
+    quickReplyPaid: settings.quickReplyPaid || defaultStore.quickReplyPaid,
+    quickReplySoon: settings.quickReplySoon || defaultStore.quickReplySoon,
+    quickReplyProof: settings.quickReplyProof || defaultStore.quickReplyProof,
     services,
     coupons,
     orders,

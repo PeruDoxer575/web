@@ -93,6 +93,12 @@ Además del texto, ahora el bot tiene menú con botones para:
 - usar respuestas rápidas desde pedidos:
   `Pago recibido`, `Te escribo en breve`, `Envíame captura`
 - marcar pedidos como `pagado`, `en proceso` y `entregado`
+- editar respuestas rápidas con placeholders:
+  `{cliente}`, `{servicio}`, `{negocio}`
+- mini panel principal por secciones
+- menú de favoritos con atajos rápidos
+- mensajes del bot con formato Markdown más bonito
+- stickers distintos según acción importante
 
 En edición de fotos:
 
