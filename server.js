@@ -103,6 +103,15 @@ const DEFAULT_QUICK_REPLIES = {
   quickReplySoon: "Hola {cliente}, ya vi tu solicitud de {servicio}. Te escribo en breve para continuar con la coordinación.",
   quickReplyProof: "Hola {cliente}, para confirmar {servicio} envíame por favor tu captura o comprobante de pago."
 };
+const TELEGRAM_STICKERS = {
+  menu: "CAACAgIAAxkBAAIBRGgAAXdW9MVL3wzI4L1J0m3Y7k4f2YkAAjQAA8A2QSu1q3M4G0a0FTYE",
+  product: "CAACAgIAAxkBAAIBRWgAAXd6E3b6c4f8H2m0kM3-7Qf8u_cAAg4AAPANkEoP4x9W3Yc4LjYE",
+  coupon: "CAACAgIAAxkBAAIBRmgAAXeG2Wq5fB7v9m-pQ7S5mV93G0QAAjcAAPANkEq7C2A5L2cQ9DYE",
+  pending: "CAACAgIAAxkBAAIBRGgAAXdW9MVL3wzI4L1J0m3Y7k4f2YkAAjQAA8A2QSu1q3M4G0a0FTYE",
+  paid: "CAACAgIAAxkBAAIBRmgAAXeG2Wq5fB7v9m-pQ7S5mV93G0QAAjcAAPANkEq7C2A5L2cQ9DYE",
+  progress: "CAACAgIAAxkBAAIBRWgAAXd6E3b6c4f8H2m0kM3-7Qf8u_cAAg4AAPANkEoP4x9W3Yc4LjYE",
+  delivered: "CAACAgIAAxkBAAIBQ2gAAXb3b3XwYwZ6mQ2bZ1S2H7w2LxwAAh0AAPANkErxk4m8F6K4bTYE"
+};
 
 function startTelegramAdminBot({ db, persistDatabase, cloudinaryEnabled }) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_IDS.length) {
@@ -220,16 +229,16 @@ async function handleTelegramAdminCommand(chatId, text, { db, persistDatabase })
   const args = rest.join(" ").trim();
 
   if (command === "/start" || command === "/menu" || command === "/ayuda") {
-    await sendTelegramSticker(chatId, "CAACAgIAAxkBAAIBRGgAAXdW9MVL3wzI4L1J0m3Y7k4f2YkAAjQAA8A2QSu1q3M4G0a0FTYE");
+    await sendTelegramSticker(chatId, TELEGRAM_STICKERS.menu);
     await sendTelegramBotMessage(
       chatId,
       "PERUDOXER admin activo\n\nMueve productos, pedidos, cupones y ajustes desde aquí sin entrar al panel web.",
       {
         inline_keyboard: [
-          [{ text: "Productos", callback_data: "menu_products" }, { text: "Agregar producto", callback_data: "menu_add_service" }],
-          [{ text: "Cupones", callback_data: "menu_coupons" }, { text: "Pedidos", callback_data: "menu_orders" }],
-          [{ text: "Resumen", callback_data: "menu_summary" }, { text: "Ajustes", callback_data: "menu_settings" }],
-          [{ text: "Favoritos", callback_data: "menu_favorites" }, { text: "Respuestas", callback_data: "menu_quick_replies" }]
+          [{ text: "📦 Productos", callback_data: "menu_products" }, { text: "➕ Agregar", callback_data: "menu_add_service" }],
+          [{ text: "🎟️ Cupones", callback_data: "menu_coupons" }, { text: "📬 Pedidos", callback_data: "menu_orders" }],
+          [{ text: "📊 Resumen", callback_data: "menu_summary" }, { text: "⚙️ Ajustes", callback_data: "menu_settings" }],
+          [{ text: "⭐ Favoritos", callback_data: "menu_favorites" }, { text: "💬 Respuestas", callback_data: "menu_quick_replies" }]
         ]
       }
     );
@@ -430,7 +439,7 @@ async function continueAddServiceWizard(chatId, message, session, { db, persistD
     );
     persistDatabase(db);
     telegramBotSessions.delete(chatId);
-    await sendTelegramSticker(chatId, "CAACAgIAAxkBAAIBRWgAAXd6E3b6c4f8H2m0kM3-7Qf8u_cAAg4AAPANkEoP4x9W3Yc4LjYE");
+    await sendTelegramSticker(chatId, TELEGRAM_STICKERS.product);
     await sendTelegramBotMessage(chatId, `Producto creado con éxito: ${data.name}`);
   }
 }
@@ -476,7 +485,7 @@ async function continueAddCouponWizard(chatId, message, session, { db, persistDa
     );
     persistDatabase(db);
     telegramBotSessions.delete(chatId);
-    await sendTelegramSticker(chatId, "CAACAgIAAxkBAAIBRmgAAXeG2Wq5fB7v9m-pQ7S5mV93G0QAAjcAAPANkEq7C2A5L2cQ9DYE");
+    await sendTelegramSticker(chatId, TELEGRAM_STICKERS.coupon);
     await sendTelegramBotMessage(chatId, `Cupón creado con éxito: ${data.code}`);
   }
 }
@@ -654,6 +663,7 @@ async function handleTelegramAdminCallback(callbackQuery, { db, persistDatabase 
 
   if (data === "menu_products") {
     await answerTelegramCallback(callbackId, "Productos");
+    await sendTelegramSticker(chatId, TELEGRAM_STICKERS.product);
     await sendTelegramProductsMenu(chatId, db);
     return;
   }
@@ -661,42 +671,49 @@ async function handleTelegramAdminCallback(callbackQuery, { db, persistDatabase 
   if (data === "menu_add_service") {
     telegramBotSessions.set(chatId, { mode: "add_service", step: "name", data: {} });
     await answerTelegramCallback(callbackId, "Agregar producto");
+    await sendTelegramSticker(chatId, TELEGRAM_STICKERS.product);
     await sendTelegramBotMessage(chatId, "Vamos a agregar un producto.\n\n1. Envíame el nombre del servicio.");
     return;
   }
 
   if (data === "menu_coupons") {
     await answerTelegramCallback(callbackId, "Cupones");
+    await sendTelegramSticker(chatId, TELEGRAM_STICKERS.coupon);
     await sendTelegramCouponsMenu(chatId, db);
     return;
   }
 
   if (data === "menu_orders") {
     await answerTelegramCallback(callbackId, "Pedidos");
+    await sendTelegramSticker(chatId, TELEGRAM_STICKERS.pending);
     await sendTelegramOrders(chatId, db);
     return;
   }
 
   if (data === "menu_summary") {
     await answerTelegramCallback(callbackId, "Resumen");
+    await sendTelegramSticker(chatId, TELEGRAM_STICKERS.menu);
     await sendTelegramSummary(chatId, db);
     return;
   }
 
   if (data === "menu_favorites") {
     await answerTelegramCallback(callbackId, "Favoritos");
+    await sendTelegramSticker(chatId, TELEGRAM_STICKERS.menu);
     await sendTelegramFavoritesMenu(chatId);
     return;
   }
 
   if (data === "menu_settings") {
     await answerTelegramCallback(callbackId, "Ajustes");
+    await sendTelegramSticker(chatId, TELEGRAM_STICKERS.menu);
     await sendTelegramSettingsMenu(chatId, db);
     return;
   }
 
   if (data === "menu_quick_replies") {
     await answerTelegramCallback(callbackId, "Respuestas");
+    await sendTelegramSticker(chatId, TELEGRAM_STICKERS.coupon);
     await sendTelegramQuickRepliesMenu(chatId, db);
     return;
   }
@@ -971,10 +988,12 @@ async function handleTelegramAdminCallback(callbackQuery, { db, persistDatabase 
     db.run("UPDATE orders SET status = ? WHERE id = ?", [status, orderId]);
     persistDatabase(db);
     await answerTelegramCallback(callbackId, "Pedido actualizado");
-    if (status === "entregado") {
-      await sendTelegramSticker(chatId, "CAACAgIAAxkBAAIBQ2gAAXb3b3XwYwZ6mQ2bZ1S2H7w2LxwAAh0AAPANkErxk4m8F6K4bTYE");
+    const store = readStore(db);
+    const updatedOrder = store.orders.find((item) => item.id === orderId);
+    await sendTelegramSticker(chatId, getOrderStatusSticker(status));
+    if (updatedOrder && callbackQuery.message?.message_id) {
+      await editTelegramOrderMessage(chatId, callbackQuery.message.message_id, updatedOrder);
     }
-    await sendTelegramOrders(chatId, db);
     return;
   }
 
@@ -1020,9 +1039,9 @@ async function sendTelegramProductsMenu(chatId, db) {
       ...store.services.slice(0, 12).map((service) => ([
         { text: `${service.name.slice(0, 24)} • ${service.status}`, callback_data: `product_view:${service.id}` }
       ])),
-      [{ text: "Buscar producto", callback_data: "menu_search" }],
-      [{ text: "Ajustes del negocio", callback_data: "menu_settings" }],
-      [{ text: "Volver al menú", callback_data: "menu_back" }]
+      [{ text: "🔎 Buscar producto", callback_data: "menu_search" }],
+      [{ text: "⚙️ Ajustes del negocio", callback_data: "menu_settings" }],
+      [{ text: "⬅️ Volver al menú", callback_data: "menu_back" }]
     ]
   });
 }
@@ -1058,7 +1077,7 @@ async function sendTelegramProductCard(chatId, service) {
           { text: "Eliminar", callback_data: `product_delete:${service.id}` }
         ],
         [
-          { text: "Volver a productos", callback_data: "menu_products" }
+          { text: "⬅️ Volver a productos", callback_data: "menu_products" }
         ]
       ]
     }
@@ -1078,7 +1097,7 @@ async function sendTelegramProductSearch(chatId, db, query) {
 
   if (!results.length) {
     await sendTelegramBotMessage(chatId, "No encontré productos con ese nombre. Prueba con otra palabra.", {
-      inline_keyboard: [[{ text: "Volver a productos", callback_data: "menu_products" }]]
+      inline_keyboard: [[{ text: "⬅️ Volver a productos", callback_data: "menu_products" }]]
     });
     return;
   }
@@ -1088,7 +1107,7 @@ async function sendTelegramProductSearch(chatId, db, query) {
       ...results.slice(0, 12).map((service) => ([
         { text: `${service.name.slice(0, 24)} • ${service.status}`, callback_data: `product_view:${service.id}` }
       ])),
-      [{ text: "Volver a productos", callback_data: "menu_products" }]
+      [{ text: "⬅️ Volver a productos", callback_data: "menu_products" }]
     ]
   });
 }
@@ -1107,8 +1126,8 @@ async function sendTelegramCouponsMenu(chatId, db) {
     ]
   ]));
 
-  rows.unshift([{ text: "Crear cupón", callback_data: "coupon_add" }]);
-  rows.push([{ text: "Volver al menú", callback_data: "menu_back" }]);
+  rows.unshift([{ text: "🎟️ Crear cupón", callback_data: "coupon_add" }]);
+  rows.push([{ text: "⬅️ Volver al menú", callback_data: "menu_back" }]);
   await sendTelegramBotMessage(chatId, "Panel de cupones listo. Aquí controlas descuentos al vuelo:", { inline_keyboard: rows });
 }
 
@@ -1120,47 +1139,61 @@ async function sendTelegramOrders(chatId, db) {
   }
 
   for (const order of store.orders.slice(0, 10)) {
-    const buttons = [
-      [
-        { text: "Pendiente", callback_data: `order_status:${order.id}:pendiente` },
-        { text: "Pagado", callback_data: `order_status:${order.id}:pagado` }
-      ],
-      [
-        { text: "En proceso", callback_data: `order_status:${order.id}:en_proceso` },
-        { text: "Entregado", callback_data: `order_status:${order.id}:entregado` }
-      ]
-    ];
-    buttons.push(
-      [
-        { text: "Pago recibido", callback_data: `order_reply:${order.id}:paid` },
-        { text: "Te escribo en breve", callback_data: `order_reply:${order.id}:soon` }
-      ],
-      [
-        { text: "Envíame captura", callback_data: `order_reply:${order.id}:proof` }
-      ]
-    );
-    if (order.paymentProofUrl) {
-      buttons.push([{ text: "Ver comprobante", url: order.paymentProofUrl }]);
-    }
-
-    await sendTelegramBotMessage(
-      chatId,
-      [
-        "Pedido en movimiento",
-        `Servicio: ${order.serviceName}`,
-        `Cliente: ${order.customerName}`,
-        `Precio: ${order.finalPrice || order.servicePrice}`,
-        `Estado: ${humanizeOrderStatus(order.status || "pendiente")}`,
-        order.couponCode ? `Cupón: ${order.couponCode}` : "",
-        `Fecha: ${order.createdAt}`
-      ].filter(Boolean).join("\n"),
-      { inline_keyboard: buttons }
-    );
+    await sendTelegramBotMessage(chatId, formatTelegramOrderMessage(order), {
+      inline_keyboard: buildTelegramOrderButtons(order)
+    });
   }
 
   await sendTelegramBotMessage(chatId, "Fin de pedidos.", {
-    inline_keyboard: [[{ text: "Volver al menú", callback_data: "menu_back" }]]
+    inline_keyboard: [[{ text: "⬅️ Volver al menú", callback_data: "menu_back" }]]
   });
+}
+
+function formatTelegramOrderMessage(order) {
+  return [
+    "Pedido en movimiento",
+    `Servicio: ${order.serviceName}`,
+    `Cliente: ${order.customerName}`,
+    `Precio: ${order.finalPrice || order.servicePrice}`,
+    `Estado: ${humanizeOrderStatus(order.status || "pendiente")}`,
+    order.couponCode ? `Cupón: ${order.couponCode}` : "",
+    `Fecha: ${order.createdAt}`
+  ].filter(Boolean).join("\n");
+}
+
+function buildTelegramOrderButtons(order) {
+  const currentStatus = order.status || "pendiente";
+  const buttons = [
+    [
+      buildOrderStatusButton(order.id, currentStatus, "pendiente", "Pendiente", "🟡"),
+      buildOrderStatusButton(order.id, currentStatus, "pagado", "Pagado", "💸")
+    ],
+    [
+      buildOrderStatusButton(order.id, currentStatus, "en_proceso", "En proceso", "⚙️"),
+      buildOrderStatusButton(order.id, currentStatus, "entregado", "Entregado", "✅")
+    ],
+    [
+      { text: "Pago recibido", callback_data: `order_reply:${order.id}:paid` },
+      { text: "Te escribo en breve", callback_data: `order_reply:${order.id}:soon` }
+    ],
+    [
+      { text: "Envíame captura", callback_data: `order_reply:${order.id}:proof` }
+    ]
+  ];
+
+  if (order.paymentProofUrl) {
+    buttons.push([{ text: "Ver comprobante", url: order.paymentProofUrl }]);
+  }
+
+  return buttons;
+}
+
+function buildOrderStatusButton(orderId, currentStatus, targetStatus, label, emoji) {
+  const isActive = currentStatus === targetStatus;
+  return {
+    text: isActive ? `${emoji} ${label}` : label,
+    callback_data: `order_status:${orderId}:${targetStatus}`
+  };
 }
 
 async function sendTelegramSummary(chatId, db) {
@@ -1180,7 +1213,7 @@ async function sendTelegramSummary(chatId, db) {
       `Ventas estimadas: ${formatPrice(totalSales, store.storeCurrency, store.storeCurrency)}`
     ].join("\n"),
     {
-      inline_keyboard: [[{ text: "Volver al menú", callback_data: "menu_back" }]]
+      inline_keyboard: [[{ text: "⬅️ Volver al menú", callback_data: "menu_back" }]]
     }
   );
 }
@@ -1207,7 +1240,7 @@ async function sendTelegramSettingsMenu(chatId, db) {
           { text: "Cambiar lema", callback_data: "setting_edit:storeHandle" }
         ],
         [
-          { text: "Volver al menú", callback_data: "menu_back" }
+          { text: "⬅️ Volver al menú", callback_data: "menu_back" }
         ]
       ]
     }
@@ -1221,15 +1254,15 @@ async function sendTelegramFavoritesMenu(chatId) {
     {
       inline_keyboard: [
         [
-          { text: "Pedidos", callback_data: "menu_orders" },
-          { text: "Agregar producto", callback_data: "menu_add_service" }
+          { text: "📬 Pedidos", callback_data: "menu_orders" },
+          { text: "➕ Agregar", callback_data: "menu_add_service" }
         ],
         [
-          { text: "Buscar producto", callback_data: "menu_search" },
-          { text: "Cupones", callback_data: "menu_coupons" }
+          { text: "🔎 Buscar producto", callback_data: "menu_search" },
+          { text: "🎟️ Cupones", callback_data: "menu_coupons" }
         ],
         [
-          { text: "Volver al menú", callback_data: "menu_back" }
+          { text: "⬅️ Volver al menú", callback_data: "menu_back" }
         ]
       ]
     }
@@ -1249,16 +1282,16 @@ async function sendTelegramQuickRepliesMenu(chatId, db) {
     {
       inline_keyboard: [
         [
-          { text: "Editar pago recibido", callback_data: "quick_reply_edit:quickReplyPaid" }
+          { text: "💸 Editar pago recibido", callback_data: "quick_reply_edit:quickReplyPaid" }
         ],
         [
-          { text: "Editar te escribo en breve", callback_data: "quick_reply_edit:quickReplySoon" }
+          { text: "⏳ Editar te escribo en breve", callback_data: "quick_reply_edit:quickReplySoon" }
         ],
         [
-          { text: "Editar envíame captura", callback_data: "quick_reply_edit:quickReplyProof" }
+          { text: "🧾 Editar envíame captura", callback_data: "quick_reply_edit:quickReplyProof" }
         ],
         [
-          { text: "Volver al menú", callback_data: "menu_back" }
+          { text: "⬅️ Volver al menú", callback_data: "menu_back" }
         ]
       ]
     }
@@ -1294,6 +1327,41 @@ async function sendTelegramSticker(chatId, sticker) {
     body: JSON.stringify({
       chat_id: chatId,
       sticker
+    })
+  });
+}
+
+function getOrderStatusSticker(status) {
+  if (status === "pagado") {
+    return TELEGRAM_STICKERS.paid;
+  }
+
+  if (status === "en_proceso" || status === "atendido") {
+    return TELEGRAM_STICKERS.progress;
+  }
+
+  if (status === "entregado") {
+    return TELEGRAM_STICKERS.delivered;
+  }
+
+  return TELEGRAM_STICKERS.pending;
+}
+
+async function editTelegramOrderMessage(chatId, messageId, order) {
+  if (!TELEGRAM_BOT_TOKEN || !chatId || !messageId || !order) {
+    return;
+  }
+
+  await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+      text: toMarkdownMessage(formatTelegramOrderMessage(order)),
+      parse_mode: "MarkdownV2",
+      disable_web_page_preview: true,
+      reply_markup: { inline_keyboard: buildTelegramOrderButtons(order) }
     })
   });
 }
